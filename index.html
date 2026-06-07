@@ -668,11 +668,22 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
             <th>URAIAN</th>
             <th style="width:46px;text-align:center">YES</th>
             <th style="width:46px;text-align:center">NO</th>
-            <th style="width:200px">KETERANGAN</th>
+            <th style="width:220px">KETERANGAN / TINDAK LANJUT</th>
           </tr>
         </thead>
         <tbody id="pm-aktivitas-tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- WO ANOMALI SUMMARY BAR -->
+  <div id="wo-summary-bar" style="display:none;margin-bottom:14px;padding:14px 18px;background:rgba(192,57,43,.05);border:1px solid rgba(192,57,43,.3);border-radius:var(--r)">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+      <div style="flex:1">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">⚠ Anomali Ditemukan — Perlu Work Order</div>
+        <div id="wo-summary-list" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <button class="btn-red" id="wo-summary-btn" onclick="bukaBuatWOdariLaporan()" style="flex-shrink:0;font-size:12px;padding:9px 16px">⚠ Buat WO dari Laporan Ini</button>
     </div>
   </div>
 
@@ -1101,6 +1112,7 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
 //  CONFIG — ganti dengan URL Apps Script kamu
 // ════════════════════════════════════════════════════════
 const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw7mZX2OplLpKPS-prU27U1GM1KE9dvvZwggGHYgjBFvtkv2CSJ-HKW8FxjHSIzpgi0/exec';
+const WO_URL = 'https://script.google.com/macros/s/AKfycbxWC3esNUKacXKDx1cGqzrtaaH0vKW4pbsVV6_zmUj5jSXBTP2aZLJ73X6M9vW9W3ro/exec';
 
 // ════════════════════════════════════════════════════════
 //  STORE
@@ -1878,6 +1890,7 @@ function toggleAkt(cb, val) {
   const row = cb.closest('tr');
   if (val==='yes') row.querySelectorAll('.pm-no').forEach(c=>c.checked=false);
   else row.querySelectorAll('.pm-yes').forEach(c=>c.checked=false);
+  _updateWOBar();
 }
 
 function addSP() {
@@ -3048,6 +3061,8 @@ function renderReportPage() {
     const aktDone = Array.isArray(r.aktivitas) ? r.aktivitas.filter(a=>a.yes||a.no_checked).length : 0;
     const aktTotal = Array.isArray(r.aktivitas) ? r.aktivitas.length : 0;
     const hasSig = sigs[r.id] && (sigs[r.id].spvSig || sigs[r.id].leaderSig);
+    const anomaliCount = Array.isArray(r.aktivitas) ? r.aktivitas.filter(a=>a.no_checked).length : 0;
+    const sudahAdaWO = getWO().some(w => w.pmId === r.id);
     return `<div class="report-item">
       <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:8px">
         <div>
@@ -3055,7 +3070,7 @@ function renderReportPage() {
           <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--accent)">${r.tagNo||'—'}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
-          <span class="badge b-done">✓ SELESAI</span>${hasSig?'&nbsp;<span class="badge" style="background:rgba(43,108,184,.1);color:var(--blue);border:1px solid rgba(43,108,184,.2)">✍ TTD</span>':''}
+          <span class="badge b-done">✓ SELESAI</span>${hasSig?'&nbsp;<span class="badge" style="background:rgba(43,108,184,.1);color:var(--blue);border:1px solid rgba(43,108,184,.2)">✍ TTD</span>':''}${anomaliCount>0?`&nbsp;<span class="badge" style="background:rgba(192,57,43,.12);color:var(--red);border:1px solid rgba(192,57,43,.35);animation:lowblink 1.4s infinite">⚠ ${anomaliCount} Anomali</span>`:''}
           <div style="font-size:11px;color:var(--text3);margin-top:4px">${dateFmt}</div>
         </div>
       </div>
@@ -3073,6 +3088,11 @@ function renderReportPage() {
       <div class="ri-actions">
         <button class="tbl-btn pdf" onclick="downloadPMPDFById('${r.id}')">📄 Preview / Print PDF</button>
         <button class="tbl-btn" style="border-color:rgba(43,108,184,.35);color:var(--blue)" onmouseover="this.style.background='rgba(43,108,184,.07)'" onmouseout="this.style.background=''" onclick="openSignatureModal('${r.id}')">✍ Tanda Tangan</button>
+        ${anomaliCount>0
+          ? sudahAdaWO
+            ? `<button class="tbl-btn" style="border-color:rgba(74,158,63,.35);color:var(--green2);opacity:.7;cursor:default" disabled>✓ WO Dibuat</button>`
+            : `<button class="tbl-btn" style="border-color:rgba(192,57,43,.4);color:var(--red);font-weight:600" onmouseover="this.style.background='rgba(192,57,43,.07)'" onmouseout="this.style.background=''" onclick="bukaWOdariDaftarLaporan('${r.id}')">⚠ Buat WO (${anomaliCount} anomali)</button>`
+          : ''}
         <button class="tbl-btn" style="border-color:rgba(230,126,34,.35);color:var(--orange)" onmouseover="this.style.background='rgba(230,126,34,.07)'" onmouseout="this.style.background=''" onclick="editReport('${r.id}')">✏ Edit</button>
         <button class="tbl-btn del" onclick="deleteReport('${r.id}')">🗑 Hapus</button>
       </div>
@@ -3470,6 +3490,243 @@ window.addEventListener('load', () => {
   renderDashboard();
   populateUnitFilters();
 });
+// ════════════════════════════════════════════════════════
+//  WORK ORDER — dari laporan PM (semua anomali → 1 WO)
+// ════════════════════════════════════════════════════════
+const STORE_WO = 'work_orders_v1';
+
+function getWO() {
+  try { return JSON.parse(localStorage.getItem(STORE_WO)||'[]'); } catch { return []; }
+}
+function setWO(data) {
+  try { localStorage.setItem(STORE_WO, JSON.stringify(data)); } catch(e) {}
+}
+
+function _updateWOBar() {
+  const bar  = document.getElementById('wo-summary-bar');
+  const list = document.getElementById('wo-summary-list');
+  const btn  = document.getElementById('wo-summary-btn');
+  if (!bar || !list) return;
+
+  const anomaliItems = [];
+  document.querySelectorAll('#pm-aktivitas-tbody tr').forEach(row => {
+    if (!row.querySelector('.pm-no')?.checked) return;
+    const uraian = row.cells[1]?.textContent?.trim() || '';
+    const ket    = row.querySelector('.pm-keterangan')?.value?.trim() || '';
+    anomaliItems.push({ uraian, ket });
+  });
+
+  if (!anomaliItems.length) { bar.style.display='none'; return; }
+  bar.style.display = 'block';
+
+  list.innerHTML = anomaliItems.map((a,i) => `
+    <div style="display:flex;align-items:flex-start;gap:8px;font-size:12px">
+      <span style="color:var(--red);font-family:'IBM Plex Mono',monospace;flex-shrink:0">${i+1}.</span>
+      <span><strong>${a.uraian}</strong>${a.ket?` <span style="color:var(--text3)">— ${a.ket}</span>`:''}</span>
+    </div>`).join('');
+
+  // Cek jika WO untuk PM ini sudah dibuat
+  const pmId = document.getElementById('pm-edit-id')?.value || '';
+  if (pmId && btn) {
+    const sudahAda = getWO().some(w => w.pmId === pmId);
+    if (sudahAda) {
+      btn.textContent = '✓ WO Sudah Dibuat';
+      btn.disabled = true;
+      btn.style.opacity = '.6';
+    } else {
+      btn.textContent = '⚠ Buat WO dari Laporan Ini';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+    }
+  }
+}
+
+function bukaBuatWOdariLaporan() {
+  const equipment = document.getElementById('pm-equipment-name')?.value?.trim() || '—';
+  const tagNo     = document.getElementById('pm-tagno')?.value?.trim() || '—';
+  const unit      = document.getElementById('pm-unit')?.value?.trim() || '';
+  const area      = document.getElementById('pm-area')?.value?.trim() || '';
+  const teknisi   = document.getElementById('pm-teknisi')?.value?.trim() || '';
+
+  const anomaliItems = [];
+  document.querySelectorAll('#pm-aktivitas-tbody tr').forEach(row => {
+    if (!row.querySelector('.pm-no')?.checked) return;
+    const uraian = row.cells[1]?.textContent?.trim() || '';
+    const ket    = row.querySelector('.pm-keterangan')?.value?.trim() || '';
+    anomaliItems.push({ uraian, ket });
+  });
+
+  if (!anomaliItems.length) { toast('Tidak ada item anomali (NO)','info'); return; }
+
+  document.getElementById('wo-equipment').value    = equipment;
+  document.getElementById('wo-tagno').value        = tagNo;
+  document.getElementById('wo-unit-area').value    = [unit, area].filter(Boolean).join(' / ');
+  document.getElementById('wo-teknisi-ref').value  = teknisi;
+  document.getElementById('wo-prioritas').value    = 'medium';
+  document.getElementById('wo-assignee').value     = '';
+
+  document.getElementById('wo-anomali-list').innerHTML = anomaliItems.map((a,i) => `
+    <div style="display:flex;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(192,57,43,.15)">
+      <span style="color:var(--red);font-family:'IBM Plex Mono',monospace;flex-shrink:0">${i+1}.</span>
+      <div><div style="font-weight:500">${a.uraian}</div>${a.ket?`<div style="font-size:11px;color:var(--text3)">${a.ket}</div>`:''}</div>
+    </div>`).join('');
+
+  document.getElementById('wo-deskripsi').value = anomaliItems
+    .map((a,i)=>`${i+1}. ${a.uraian}${a.ket?' ('+a.ket+')':''}`)
+    .join('\n');
+
+  window._woPMContext = {
+    pmId:    document.getElementById('pm-edit-id')?.value || '',
+    tanggal: document.getElementById('pm-date')?.value || new Date().toISOString().split('T')[0],
+    equipment, tagNo, unit, area, teknisi, anomaliItems
+  };
+
+  openOverlay('woFromPMOverlay');
+  setTimeout(() => document.getElementById('wo-deskripsi')?.focus(), 150);
+}
+
+async function simpanWOdariPM() {
+  const deskripsi = document.getElementById('wo-deskripsi')?.value?.trim();
+  if (!deskripsi) { toast('Isi deskripsi pekerjaan WO','error'); return; }
+
+  const ctx = window._woPMContext || {};
+  const wo  = {
+    id:           'WO-' + Date.now() + '-' + Math.random().toString(36).substr(2,5).toUpperCase(),
+    sumber:       'PM',
+    pmId:         ctx.pmId || '',
+    tanggal:      ctx.tanggal,
+    equipment:    ctx.equipment,
+    tagNo:        ctx.tagNo,
+    unit:         ctx.unit,
+    area:         ctx.area,
+    unitArea:     [ctx.unit, ctx.area].filter(Boolean).join(' / '),
+    teknisiPM:    ctx.teknisi,
+    anomaliItems: ctx.anomaliItems || [],
+    deskripsi,
+    prioritas:    document.getElementById('wo-prioritas')?.value || 'medium',
+    assignee:     document.getElementById('wo-assignee')?.value?.trim() || '',
+    status:       'open',
+    createdAt:    new Date().toISOString(),
+    materialRequests: []
+  };
+
+  const list = getWO();
+  list.unshift(wo);
+  setWO(list);
+
+  const btn = document.getElementById('wo-summary-btn');
+  if (btn) { btn.textContent='✓ WO Sudah Dibuat'; btn.disabled=true; btn.style.opacity='.6'; }
+
+  closeOverlay('woFromPMOverlay');
+  renderReportList();
+  toast(`✅ Work Order ${wo.id} dibuat — ${wo.anomaliItems.length} anomali`, 'success');
+
+  // Sync ke WO Apps Script
+  try {
+    const woForSheets = {
+      ...wo,
+      anomaliItems:     JSON.stringify(wo.anomaliItems || []),
+      materialRequests: JSON.stringify(wo.materialRequests || [])
+    };
+
+    // Coba via fetch GET dengan action parameter langsung
+    const params = new URLSearchParams({
+      action: 'saveWO',
+      _body: JSON.stringify({ action: 'saveWO', wo: woForSheets })
+    });
+    const res = await fetch(`${WO_URL}?${params.toString()}`);
+    const json = await res.json();
+
+    if (json?.success) {
+      toast('☁ WO tersinkron ke database WO ✓', 'success');
+    } else {
+      toast('⚠ WO tersimpan lokal, gagal sync: ' + (json?.message||''), 'warning');
+      console.warn('[WO] saveWO gagal:', json);
+    }
+  } catch(e) {
+    toast('⚠ WO tersimpan lokal, cek koneksi', 'warning');
+    console.warn('[WO] saveWO exception:', e);
+  }
+}
+function bukaWOdariDaftarLaporan(pmId) {
+  const r = getData(STORE.REPORTS).find(x => x.id === pmId);
+  if (!r) { toast('Laporan tidak ditemukan','error'); return; }
+
+  const anomaliItems = (r.aktivitas||[])
+    .filter(a => a.no_checked)
+    .map(a => ({ uraian: a.uraian||'', ket: a.keterangan||'' }));
+
+  if (!anomaliItems.length) { toast('Tidak ada anomali di laporan ini','info'); return; }
+
+  const _set = (id, val) => { const el=document.getElementById(id); if(el) el.value=val; };
+  _set('wo-equipment',   r.equipmentName || '—');
+  _set('wo-tagno',       r.tagNo || '—');
+  _set('wo-unit-area',   [r.unit, r.area].filter(Boolean).join(' / '));
+  _set('wo-teknisi-ref', r.teknisi || '');
+  _set('wo-prioritas',   'medium');
+  _set('wo-assignee',    '');
+
+  const anomaliListEl = document.getElementById('wo-anomali-list');
+  if (anomaliListEl) anomaliListEl.innerHTML = anomaliItems.map((a,i) => `
+    <div style="display:flex;gap:8px;font-size:12px;padding:5px 0;border-bottom:1px solid rgba(192,57,43,.15)">
+      <span style="color:var(--red);font-family:'IBM Plex Mono',monospace;flex-shrink:0">${i+1}.</span>
+      <div><div style="font-weight:500">${a.uraian}</div>${a.ket?`<div style="font-size:11px;color:var(--text3)">${a.ket}</div>`:''}</div>
+    </div>`).join('');
+
+  document.getElementById('wo-deskripsi').value = anomaliItems
+    .map((a,i) => `${i+1}. ${a.uraian}${a.ket?' ('+a.ket+')':''}`)
+    .join('\n');
+
+  window._woPMContext = {
+    pmId: r.id,
+    tanggal: r.date || new Date().toISOString().split('T')[0],
+    equipment: r.equipmentName || '—',
+    tagNo: r.tagNo || '',
+    unit: r.unit || '',
+    area: r.area || '',
+    teknisi: r.teknisi || '',
+    anomaliItems
+  };
+
+  openOverlay('woFromPMOverlay');
+  setTimeout(() => document.getElementById('wo-deskripsi')?.focus(), 150);
+}
 </script>
+
+<!-- MODAL: BUAT WORK ORDER DARI LAPORAN PM -->
+<div class="overlay" id="woFromPMOverlay">
+  <div class="modal modal-lg">
+    <div class="modal-hdr">
+      <span class="modal-title">⚠ Buat Work Order dari Laporan PM</span>
+      <button class="modal-close" onclick="closeOverlay('woFromPMOverlay')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="margin-bottom:16px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Daftar Anomali yang Ditemukan</div>
+        <div id="wo-anomali-list" style="padding:10px 14px;background:rgba(192,57,43,.05);border:1px solid rgba(192,57,43,.2);border-radius:7px"></div>
+      </div>
+      <div class="form-grid">
+        <div class="fg"><span class="flabel">Equipment</span><input class="finput" type="text" id="wo-equipment" readonly style="background:var(--bg3)"></div>
+        <div class="fg"><span class="flabel">Tag No</span><input class="finput" type="text" id="wo-tagno" readonly style="background:var(--bg3)"></div>
+        <div class="fg"><span class="flabel">Unit / Area</span><input class="finput" type="text" id="wo-unit-area" readonly style="background:var(--bg3)"></div>
+        <div class="fg"><span class="flabel">Teknisi PM (referensi)</span><input class="finput" type="text" id="wo-teknisi-ref" readonly style="background:var(--bg3)"></div>
+        <div class="fg full"><span class="flabel">Deskripsi Pekerjaan WO *</span><textarea class="ftextarea" id="wo-deskripsi" rows="4" placeholder="Detail pekerjaan yang harus dilakukan..."></textarea></div>
+        <div class="fg">
+          <span class="flabel">Prioritas</span>
+          <select class="fsel2" id="wo-prioritas">
+            <option value="low">🟢 Low — Tidak mengganggu operasional</option>
+            <option value="medium" selected>🟡 Medium — Selesai dalam 3 hari</option>
+            <option value="high">🔴 High — Tangani hari ini</option>
+          </select>
+        </div>
+        <div class="fg"><span class="flabel">Ditugaskan Kepada</span><input class="finput" type="text" id="wo-assignee" placeholder="Nama teknisi / tim pelaksana"></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-ghost" onclick="closeOverlay('woFromPMOverlay')">Batal</button>
+        <button class="btn-red" onclick="simpanWOdariPM()" style="min-width:180px">⚠ SIMPAN WORK ORDER</button>
+      </div>
+    </div>
+  </div>
+</div>
 </body>
 </html>
