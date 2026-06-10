@@ -392,6 +392,17 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
     </button>
   </div>
   <div class="sb-section">
+    <div class="sb-label">Tindak Lanjut</div>
+    <button class="sb-item" data-page="outstanding" onclick="showPage('outstanding');renderOutstandingPage()">
+      <span class="sb-icon">⚡</span>Outstanding PM
+      <span id="sb-outstanding-badge" style="margin-left:auto;background:rgba(192,57,43,.18);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;display:none">0</span>
+    </button>
+    <button class="sb-item" data-page="takeover" onclick="showPage('takeover');renderTakeoverPage()">
+      <span class="sb-icon">🔄</span>Takeover PM
+      <span id="sb-takeover-badge" style="margin-left:auto;background:rgba(230,126,34,.18);color:var(--orange);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;display:none">0</span>
+    </button>
+  </div>
+  <div class="sb-section">
     <div class="sb-label">Pengaturan</div>
     <button class="sb-item" data-page="templates" onclick="showPage('templates');loadTemplatePage()">
       <span class="sb-icon">🛠</span>Kelola Template PM
@@ -409,82 +420,58 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
       <div class="sec-sub" id="dashboardDate">—</div>
     </div>
     <div style="display:flex;gap:6px">
-      <button class="btn-ghost" onclick="pingSheets()" title="Test koneksi ke GAS">🔌 Test Conn</button>
-      <button class="btn-ghost" onclick="syncFromSheets()">↻ Refresh Data</button>
+      <button class="btn-ghost" onclick="syncFromSheets()">↻ Sync</button>
     </div>
   </div>
 
-  <!-- KPI Cards -->
-  <div class="stat-grid">
-    <div class="stat-card c-green" onclick="showPage('schedule')">
-      <div class="stat-lbl">Total Schedule</div><div class="stat-val" id="sc-total">—</div><div class="stat-sub">PM terdaftar</div>
-    </div>
-    <div class="stat-card c-red" onclick="quickStatus('overdue')">
-      <div class="stat-lbl">Overdue</div><div class="stat-val" id="sc-overdue">—</div><div class="stat-sub">melewati jadwal</div>
-    </div>
-    <div class="stat-card c-orange" onclick="quickStatus('upcoming')">
-      <div class="stat-lbl">Upcoming 7 Hari</div><div class="stat-val" id="sc-upcoming">—</div><div class="stat-sub">akan jatuh tempo</div>
-    </div>
-    <div class="stat-card c-green" onclick="showPage('list')">
-      <div class="stat-lbl">Selesai Bulan Ini</div><div class="stat-val" id="sc-done-month">—</div><div class="stat-sub">laporan terkirim</div>
-    </div>
-    <div class="stat-card c-blue" onclick="showPage('list')">
-      <div class="stat-lbl">Total Laporan</div><div class="stat-val" id="sc-total-reports">—</div><div class="stat-sub">semua waktu</div>
-    </div>
-  </div>
+  <!-- 3 KPI Utama -->
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
 
-  <!-- THIS WEEK TARGET -->
-  <div class="week-target-card" id="week-target-card" style="display:none">
-    <div class="week-target-hdr">
-      <div>
-        <div class="week-target-title">🎯 Target Minggu Ini</div>
-        <div class="week-target-period" id="week-period-label">—</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:20px;font-weight:700" id="week-progress-txt">0/0</div>
-        <div style="font-size:10px;color:rgba(255,255,255,.4);font-family:'IBM Plex Mono',monospace">selesai</div>
+    <div style="background:var(--navy);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Completion Rate</div>
+      <div style="font-size:42px;font-weight:800;color:#fff;line-height:1" id="kpi-completion">—</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:6px" id="kpi-completion-sub">— schedule selesai</div>
+      <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.1)">
+        <div id="kpi-completion-bar" style="height:100%;background:var(--green);transition:width .5s ease;width:0%"></div>
       </div>
     </div>
-    <div style="height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin-bottom:14px;overflow:hidden">
-      <div id="week-progress-bar" style="height:100%;background:var(--green);border-radius:2px;transition:width .4s ease;width:0%"></div>
+
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Overdue</div>
+      <div style="font-size:42px;font-weight:800;line-height:1;color:var(--red)" id="kpi-overdue">—</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px">PM melewati jadwal</div>
+      <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--red)"></div>
     </div>
-    <div id="week-target-list"><div style="font-size:12px;color:rgba(255,255,255,.4);text-align:center;padding:12px">Tidak ada target minggu ini</div></div>
+
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Upcoming (7 hari)</div>
+      <div style="font-size:42px;font-weight:800;line-height:1;color:var(--orange)" id="kpi-upcoming">—</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:6px">PM akan jatuh tempo</div>
+      <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--orange)"></div>
+    </div>
+
   </div>
 
-  <!-- Charts -->
-  <div class="chart-grid">
-    <div class="chart-card"><div class="chart-lbl">Status Schedule PM</div><div class="chart-wrap"><canvas id="cStatus"></canvas></div></div>
-    <div class="chart-card"><div class="chart-lbl">Laporan per Bulan (6 Bulan)</div><div class="chart-wrap"><canvas id="cMonthly"></canvas></div></div>
-    <div class="chart-card"><div class="chart-lbl">PM per Equipment Type</div><div class="chart-wrap"><canvas id="cEquipType"></canvas></div></div>
-    <div class="chart-card"><div class="chart-lbl">PM per Periode</div><div class="chart-wrap"><canvas id="cPeriode"></canvas></div></div>
-  </div>
+  <!-- Row 2: Overdue list + Chart -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px" id="dash-top-grid">
 
-  <!-- Overdue Alert -->
-  <div id="overdue-alert" style="display:none;margin-bottom:16px;padding:14px 18px;background:rgba(192,57,43,.06);border:1px solid rgba(192,57,43,.3);border-radius:var(--r)">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-      <span style="font-size:16px">⚠</span>
-      <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--red);letter-spacing:.05em;text-transform:uppercase">PM OVERDUE — Segera Ditangani</span>
-    </div>
-    <div id="overdue-list" style="display:flex;flex-direction:column;gap:6px"></div>
-  </div>
+    <!-- Chart + mini stats -->
+    <div style="display:flex;flex-direction:column;gap:14px">
 
-  <!-- Two col: Upcoming & Tree -->
-  <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:14px;align-items:start" id="dash-bottom-grid">
-    <!-- Upcoming -->
-    <div class="section-card" style="margin-bottom:0">
-      <div class="section-card-title">Upcoming PM (7 Hari)</div>
-      <div id="upcoming-list"><div class="empty"><div class="empty-msg">Tidak ada PM yang akan jatuh tempo dalam 7 hari.</div></div></div>
-    </div>
-    <!-- Tree: Unit → Area → Equipment -->
-    <div>
-      <div class="section-card-title" style="padding:14px 16px 8px;border-bottom:1px solid var(--border);margin-bottom:0;background:var(--bg2);border:1px solid var(--border);border-bottom:none;border-radius:var(--r) var(--r) 0 0">Status Equipment (Unit → Area)</div>
-      <div class="tree-wrap" style="border-radius:0 0 var(--r) var(--r)" id="eq-tree">
-        <div class="empty"><div class="empty-msg">Belum ada data schedule.</div></div>
+      <div class="chart-card">
+        <div class="chart-lbl">Status Schedule PM</div>
+        <div class="chart-wrap" style="height:160px"><canvas id="cStatus"></canvas></div>
       </div>
+
+      <div class="chart-card">
+        <div class="chart-lbl">Laporan Masuk per Bulan</div>
+        <div class="chart-wrap" style="height:160px"><canvas id="cMonthly"></canvas></div>
+      </div>
+
     </div>
   </div>
 
-  <style>@media(max-width:900px){#dash-bottom-grid{grid-template-columns:1fr}}</style>
+  <style>@media(max-width:900px){#dash-top-grid{grid-template-columns:1fr}}</style>
 </div>
 
 <!-- ═══════════ SCHEDULE PAGE ═══════════ -->
@@ -563,10 +550,11 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
     </div>
   </div>
   <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:11px;align-items:center">
-    <span><span class="cal-cell-P" style="display:inline-block;margin-right:4px">P</span> Terjadwal</span>
-    <span><span style="display:inline-block;width:18px;height:18px;background:var(--green);border-radius:3px;margin-right:4px;vertical-align:middle"></span> Selesai</span>
-    <span><span style="display:inline-block;width:18px;height:18px;background:var(--red);border-radius:3px;margin-right:4px;vertical-align:middle"></span> Overdue</span>
-    <span><span style="display:inline-block;width:18px;height:18px;background:var(--orange);border-radius:3px;margin-right:4px;vertical-align:middle"></span> Upcoming</span>
+    <span><span style="display:inline-block;padding:1px 5px;background:#4a9e3f;color:#fff;font-size:9px;font-weight:700;border-radius:3px;margin-right:4px">P</span> Planning</span>
+    <span><span style="display:inline-block;padding:1px 4px;background:var(--green);color:#fff;font-size:9px;font-weight:700;border-radius:3px;margin-right:4px">P+A</span> Planning + Actual</span>
+    <span><span style="display:inline-block;padding:1px 5px;background:var(--teal);color:#fff;font-size:9px;font-weight:700;border-radius:3px;margin-right:4px">A</span> Actual (di luar jadwal)</span>
+    <span><span style="display:inline-block;padding:1px 5px;background:var(--red);color:#fff;font-size:9px;font-weight:700;border-radius:3px;margin-right:4px">P</span> Overdue</span>
+    <span><span style="display:inline-block;padding:1px 5px;background:var(--orange);color:#fff;font-size:9px;font-weight:700;border-radius:3px;margin-right:4px">P</span> Upcoming</span>
   </div>
 </div>
 
@@ -873,6 +861,83 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
   <div id="template-list-container"></div>
 </div>
 
+<!-- ═══════════ OUTSTANDING PM PAGE ═══════════ -->
+<div class="page" id="page-outstanding">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Outstanding PM</div>
+      <div class="sec-sub" id="ost-count-lbl">—</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" onclick="renderOutstandingPage()">↻ Refresh</button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="toolbar">
+    <select class="fsel" id="ost-filter-period" onchange="renderOutstandingPage()">
+      <option value="this_week">📅 Minggu Ini</option>
+      <option value="this_month">🗓 Bulan Ini</option>
+      <option value="all">📋 Semua Outstanding</option>
+    </select>
+    <select class="fsel" id="ost-filter-unit" onchange="renderOutstandingPage()">
+      <option value="">Semua Unit</option>
+    </select>
+    <select class="fsel" id="ost-filter-area" onchange="renderOutstandingPage()">
+      <option value="">Semua Area</option>
+    </select>
+    <select class="fsel" id="ost-filter-status" onchange="renderOutstandingPage()">
+      <option value="">Semua Status</option>
+      <option value="overdue">⚠ Overdue</option>
+      <option value="upcoming">◎ Upcoming</option>
+    </select>
+    <select class="fsel" id="ost-filter-periode" onchange="renderOutstandingPage()">
+      <option value="">Semua Frekuensi</option>
+      <option>Daily</option><option>Weekly</option><option>Monthly</option>
+      <option>Quarterly</option><option>Semi-Annual</option><option>Annual</option>
+    </select>
+    <button class="btn-ghost" onclick="clearOstFilters()">✕ Reset</button>
+  </div>
+
+  <!-- Summary Bar -->
+  <div id="ost-summary-bar" style="display:none;margin-bottom:14px"></div>
+
+  <!-- List -->
+  <div id="outstanding-list"></div>
+</div>
+
+<!-- ═══════════ TAKEOVER PM PAGE ═══════════ -->
+<div class="page" id="page-takeover">
+  <div class="sec-hdr">
+    <div>
+      <div class="sec-title">Takeover PM</div>
+      <div class="sec-sub">PM yang sudah melewati bulan jadwal — perlu dialihkan ke bulan/minggu baru</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" onclick="renderTakeoverPage()">↻ Refresh</button>
+      <button class="btn-orange" onclick="bulkTakeover()">🔄 TAKEOVER SEMUA</button>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="toolbar">
+    <select class="fsel" id="tko-filter-unit" onchange="renderTakeoverPage()">
+      <option value="">Semua Unit</option>
+    </select>
+    <select class="fsel" id="tko-filter-area" onchange="renderTakeoverPage()">
+      <option value="">Semua Area</option>
+    </select>
+    <select class="fsel" id="tko-filter-periode" onchange="renderTakeoverPage()">
+      <option value="">Semua Frekuensi</option>
+      <option>Daily</option><option>Weekly</option><option>Monthly</option>
+      <option>Quarterly</option><option>Semi-Annual</option><option>Annual</option>
+    </select>
+    <button class="btn-ghost" onclick="clearTkoFilters()">✕ Reset</button>
+  </div>
+
+  <div id="takeover-list"></div>
+</div>
+
 </main>
 </div>
 
@@ -881,6 +946,7 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
   <div class="mobile-nav-inner">
     <button class="mnav-btn active" id="mnav-dashboard" onclick="showPage('dashboard')"><span class="mnav-ico">◈</span>Dashboard</button>
     <button class="mnav-btn" id="mnav-reports" onclick="showPage('reports')"><span class="mnav-ico">✏</span>Input PM</button>
+    <button class="mnav-btn" id="mnav-outstanding" onclick="showPage('outstanding');renderOutstandingPage()"><span class="mnav-ico">⚡</span>Outstanding</button>
     <button class="mnav-btn" id="mnav-schedule" onclick="showPage('schedule')"><span class="mnav-ico">📅</span>Schedule</button>
     <button class="mnav-btn" id="mnav-list" onclick="showPage('list')"><span class="mnav-ico">▤</span>Laporan</button>
   </div>
@@ -1227,12 +1293,6 @@ async function syncFromSheets() {
       const sheetsIds = new Set(repRes.reports.map(r => r.id));
       const pendingLocal = localReports.filter(r => !sheetsIds.has(r.id));
       setData(STORE.REPORTS, [...repRes.reports, ...pendingLocal]);
-
-      // Auto-retry: kirim ulang laporan yang pending ke Sheets
-      if (pendingLocal.length > 0) {
-        toast(`↻ Kirim ulang ${pendingLocal.length} laporan yang pending...`, 'info');
-        pendingLocal.forEach(r => _syncReportToSheets(r));
-      }
     }
 
     setSyncStatus('online','Tersinkron ' + new Date().toLocaleTimeString('id-ID'));
@@ -1250,6 +1310,7 @@ function renderAll() {
   renderScheduleList();
   renderReportList();
   populateUnitFilters();
+  updateSidebarBadges();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1413,58 +1474,55 @@ function renderDashboard() {
     return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
   });
 
-  setText('sc-total', schedules.length);
-  setText('sc-overdue', overdue.length);
-  setText('sc-upcoming', upcoming.length);
-  setText('sc-done-month', doneMonth.length);
-  setText('sc-total-reports', reports.length);
+  // Completion rate: schedule yang sudah dilaporkan bulan ini
+  const donePMKeys = new Set(reports.map(r => {
+    if (r.tagNo && r.tagNo.trim()) return r.tagNo.trim().toLowerCase();
+    return (r.equipmentName||'').trim().toLowerCase() + '|' + (r.unit||'').trim().toLowerCase();
+  }));
+  const schedDone = schedules.filter(s => {
+    if (s.tagNo && s.tagNo.trim()) return donePMKeys.has(s.tagNo.trim().toLowerCase());
+    return donePMKeys.has((s.equipment||'').trim().toLowerCase() + '|' + (s.unit||'').trim().toLowerCase());
+  }).length;
+  const pct = schedules.length ? Math.round(schedDone / schedules.length * 100) : 0;
+
+  setText('kpi-completion', pct + '%');
+  setText('kpi-completion-sub', `${schedDone} dari ${schedules.length} schedule selesai`);
+  setText('kpi-overdue', overdue.length);
+  setText('kpi-upcoming', upcoming.length);
   setText('dashboardDate', 'Update: ' + new Date().toLocaleString('id-ID'));
+
+  const bar = document.getElementById('kpi-completion-bar');
+  if (bar) bar.style.width = pct + '%';
 
   // Overdue alert
   const alertDiv = document.getElementById('overdue-alert');
   const overdueList = document.getElementById('overdue-list');
-  if (overdue.length) {
-    alertDiv.style.display = 'block';
-    overdueList.innerHTML = overdue.slice(0,5).map(s => {
-      const diff = Math.floor((today - getNextDue(s)) / 86400000);
-      return `<div style="font-size:12px;color:var(--text2)"><span style="color:var(--red);font-weight:600">${s.equipment}</span> — ${s.unit||''}/${s.area||''} — ${s.periode} — <strong style="color:var(--red)">${diff} hari terlambat</strong></div>`;
-    }).join('');
-  } else alertDiv.style.display = 'none';
-
-  // Upcoming list
-  const upCont = document.getElementById('upcoming-list');
-  if (!upcoming.length) {
-    upCont.innerHTML = '<div class="empty"><div class="empty-msg">Tidak ada PM yang akan jatuh tempo dalam 7 hari.</div></div>';
-  } else {
-    upCont.innerHTML = upcoming.map(s => {
-      const next = getNextDue(s);
-      const diff = Math.floor((next - today) / 86400000);
-      const color = diff <= 2 ? 'var(--red)' : diff <= 4 ? 'var(--orange)' : 'var(--green)';
-      const dot = diff <= 2 ? 'red' : diff <= 4 ? 'yellow' : 'green';
-      return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)">
-        <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
-          <span class="pulse-dot ${dot}"></span>
-          <div style="min-width:0">
-            <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s.equipment}</div>
-            <div style="font-size:11px;color:var(--text3)">${s.unit||''} · ${s.area||''} · ${s.periode}</div>
+  if (alertDiv) {
+    if (overdue.length) {
+      alertDiv.style.display = 'block';
+      overdueList.innerHTML = overdue.slice(0,8).map(s => {
+        const diff = Math.floor((today - getNextDue(s)) / 86400000);
+        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 16px;border-bottom:1px solid var(--border)">
+          <div>
+            <div style="font-size:13px;font-weight:600">${s.equipment}</div>
+            <div style="font-size:11px;color:var(--text3)">${s.unit||'—'} · ${s.area||'—'} · ${s.periode}</div>
           </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px">
-          <div style="text-align:right">
-            <div style="font-size:12px;font-weight:700;color:${color}">${diff===0?'HARI INI':diff+' hari lagi'}</div>
-            <div style="font-size:10px;color:var(--text3)">${next.toLocaleDateString('id-ID',{day:'numeric',month:'short'})}</div>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span style="font-size:11px;font-weight:700;color:var(--red)">${diff} hari</span>
+            <button class="btn-primary" style="font-size:10px;padding:4px 10px" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>
           </div>
-          <button class="btn-primary" style="font-size:10px;padding:5px 10px;white-space:nowrap" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>
-        </div>
-      </div>`;
-    }).join('');
+        </div>`;
+      }).join('');
+    } else {
+      alertDiv.style.display = 'block';
+      overdueList.innerHTML = '<div style="padding:20px 16px;text-align:center;color:var(--green2);font-size:13px">✓ Tidak ada PM overdue</div>';
+    }
   }
 
   // THIS WEEK TARGET
   renderWeekTarget(schedules, reports);
 
-  // Tree view
-  renderEqTree(schedules, reports);
+  // Tree view 
 
   // Charts
   drawDashboardCharts(reports, schedules);
@@ -1472,6 +1530,7 @@ function renderDashboard() {
 
 function renderWeekTarget(schedules, reports) {
   const card = document.getElementById('week-target-card');
+  if (!card) return;
 
   // Sembunyikan card jika belum ada schedule yang punya lastDone atau tagNo/pic diisi user
   // Seed data masih "kosong" (tidak ada lastDone, tagNo, pic)
@@ -1648,7 +1707,8 @@ function drawDashboardCharts(reports, schedules) {
   const sc = {overdue:0,upcoming:0,done:0};
   schedules.forEach(s => { sc[getScheduleStatus(s)]=(sc[getScheduleStatus(s)]||0)+1; });
   destroyChart('cStatus');
-  charts.cStatus = new Chart(document.getElementById('cStatus'), {
+  const cStatusEl = document.getElementById('cStatus');
+  if (cStatusEl) charts.cStatus = new Chart(cStatusEl, {
     type:'doughnut',
     data:{labels:['Overdue','Upcoming','On Track'],datasets:[{data:[sc.overdue,sc.upcoming,sc.done],backgroundColor:['rgba(192,57,43,.7)','rgba(230,126,34,.7)','rgba(74,158,63,.7)'],borderColor:'#fff',borderWidth:2}]},
     options:{...opts}
@@ -1667,34 +1727,41 @@ function drawDashboardCharts(reports, schedules) {
     return d.getFullYear()===m.y && d.getMonth()===m.m;
   }).length);
   destroyChart('cMonthly');
-  charts.cMonthly = new Chart(document.getElementById('cMonthly'), {
+  const cMonthlyEl = document.getElementById('cMonthly');
+  if (cMonthlyEl) charts.cMonthly = new Chart(cMonthlyEl, {
     type:'bar',
     data:{labels:months6.map(m=>m.label),datasets:[{label:'Laporan PM',data:monthly,backgroundColor:'rgba(74,158,63,.6)',borderColor:'var(--green)',borderWidth:1,borderRadius:4}]},
     options:{...opts,plugins:{...opts.plugins,legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a',font:{size:10}},grid:{color:gc}},y:{ticks:{color:'#7a9a7a'},grid:{color:gc},beginAtZero:true}}}
   });
 
-  // Equipment type
-  const typeCount = {};
-  reports.forEach(r => { const l=EQ_LABELS[r.equipmentType]||r.equipmentType||'Other'; typeCount[l]=(typeCount[l]||0)+1; });
+  // Equipment type — hanya render jika canvas ada
   destroyChart('cEquipType');
-  if (Object.keys(typeCount).length) {
-    charts.cEquipType = new Chart(document.getElementById('cEquipType'), {
-      type:'bar',
-      data:{labels:Object.keys(typeCount),datasets:[{data:Object.values(typeCount),backgroundColor:'rgba(43,108,184,.6)',borderColor:'var(--blue)',borderWidth:1,borderRadius:4}]},
-      options:{...opts,plugins:{...opts.plugins,legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a',font:{size:9}},grid:{color:gc}},y:{ticks:{color:'#7a9a7a'},grid:{color:gc},beginAtZero:true}}}
-    });
+  const cEquipTypeEl = document.getElementById('cEquipType');
+  if (cEquipTypeEl) {
+    const typeCount = {};
+    reports.forEach(r => { const l=EQ_LABELS[r.equipmentType]||r.equipmentType||'Other'; typeCount[l]=(typeCount[l]||0)+1; });
+    if (Object.keys(typeCount).length) {
+      charts.cEquipType = new Chart(cEquipTypeEl, {
+        type:'bar',
+        data:{labels:Object.keys(typeCount),datasets:[{data:Object.values(typeCount),backgroundColor:'rgba(43,108,184,.6)',borderColor:'var(--blue)',borderWidth:1,borderRadius:4}]},
+        options:{...opts,plugins:{...opts.plugins,legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a',font:{size:9}},grid:{color:gc}},y:{ticks:{color:'#7a9a7a'},grid:{color:gc},beginAtZero:true}}}
+      });
+    }
   }
 
-  // Periode
-  const pc = {};
-  schedules.forEach(s => { pc[s.periode]=(pc[s.periode]||0)+1; });
+  // Periode — hanya render jika canvas ada
   destroyChart('cPeriode');
-  if (Object.keys(pc).length) {
-    charts.cPeriode = new Chart(document.getElementById('cPeriode'), {
-      type:'doughnut',
-      data:{labels:Object.keys(pc),datasets:[{data:Object.values(pc),backgroundColor:['rgba(124,58,237,.7)','rgba(74,158,63,.7)','rgba(43,108,184,.7)','rgba(230,126,34,.7)','rgba(192,57,43,.7)','rgba(136,145,168,.7)'],borderColor:'#fff',borderWidth:2}]},
-      options:{...opts}
-    });
+  const cPeriodeEl = document.getElementById('cPeriode');
+  if (cPeriodeEl) {
+    const pc = {};
+    schedules.forEach(s => { pc[s.periode]=(pc[s.periode]||0)+1; });
+    if (Object.keys(pc).length) {
+      charts.cPeriode = new Chart(cPeriodeEl, {
+        type:'doughnut',
+        data:{labels:Object.keys(pc),datasets:[{data:Object.values(pc),backgroundColor:['rgba(124,58,237,.7)','rgba(74,158,63,.7)','rgba(43,108,184,.7)','rgba(230,126,34,.7)','rgba(192,57,43,.7)','rgba(136,145,168,.7)'],borderColor:'#fff',borderWidth:2}]},
+        options:{...opts}
+      });
+    }
   }
 }
 
@@ -1722,10 +1789,31 @@ function renderCalendar() {
   const calUnit   = document.getElementById('cal-filter-unit')?.value || '';
   const calArea   = document.getElementById('cal-filter-area')?.value || '';
   const calStatus = document.getElementById('cal-filter-status')?.value || '';
+  const allReports = getData(STORE.REPORTS);
   const schedules = allSchedules.filter(s => {
-    if (calUnit   && s.unit !== calUnit)   return false;
-    if (calArea   && s.area !== calArea)   return false;
-    if (calStatus && getScheduleStatus(s) !== calStatus) return false;
+    if (calUnit && s.unit !== calUnit) return false;
+    if (calArea && s.area !== calArea) return false;
+    if (!calStatus) return true;
+
+    const sTag  = (s.tagNo||'').trim().toLowerCase();
+    const sName = (s.equipment||'').trim().toLowerCase();
+    const sUnit = (s.unit||'').trim().toLowerCase();
+
+    // Cek apakah ada laporan untuk equipment ini di tahun yang dipilih
+    const hasReport = allReports.some(r => {
+      if (!r.date) return false;
+      // Filter tahun calendar
+      if (new Date(r.date).getFullYear() !== year) return false;
+      if (sTag && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
+      return (r.equipmentName||'').trim().toLowerCase() === sName &&
+             (r.unit||'').trim().toLowerCase() === sUnit;
+    });
+
+    const schStatus = getScheduleStatus(s);
+
+    if (calStatus === 'done')     return hasReport;
+    if (calStatus === 'overdue')  return !hasReport && schStatus === 'overdue';
+    if (calStatus === 'upcoming') return !hasReport && schStatus === 'upcoming';
     return true;
   });
 
@@ -1802,21 +1890,44 @@ function getWeeksInMonth(year, month) {
 }
 
 function getCalCell(s, col, year, today, reports) {
-  const sMonth = parseInt(s.month);
-  const sWeek = parseInt(s.week);
-  // Determine if this cell is a scheduled week
-  const isScheduled = scheduleMatchesCell(s, col, year);
-  if (!isScheduled) return '<span class="cal-cell-empty">·</span>';
-
-  // Determine status
-  const cellDate = getWeekStartDate(year, col.month-1, col.week);
-  const cellEnd = new Date(cellDate.getTime() + 6*86400000);
-  const status = getCellStatus(s, col, year, today, reports);
-  const cls = {done:'cal-cell-done',overdue:'cal-cell-overdue',upcoming:'cal-cell-upcoming','':''};
+  const isPlanned = scheduleMatchesCell(s, col, year);
   const title = `${s.equipment} - ${MONTHS_ID[col.month-1]} W${col.week}`;
-  return `<span class="cal-cell-P ${cls[status]||''}" title="${title}" onclick="openScheduleCellDetail('${s.id}','${col.month}','${col.week}')">P</span>`;
-}
+  const onclick = `openScheduleCellDetail('${s.id}','${col.month}','${col.week}')`;
 
+  const periodStart = getWeekStartDate(year, col.month-1, col.week);
+  const cellEnd = new Date(periodStart);
+  cellEnd.setDate(cellEnd.getDate() + 6);
+  cellEnd.setHours(23,59,59,999);
+
+  const sTag  = (s.tagNo||'').trim().toLowerCase();
+  const sName = (s.equipment||'').trim().toLowerCase();
+  const sUnit = (s.unit||'').trim().toLowerCase();
+
+  const hasReport = reports.some(r => {
+    if (!r.date) return false;
+    const d = new Date(r.date);
+    if (d < periodStart || d > cellEnd) return false;
+    if (sTag && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
+    return (r.equipmentName||'').trim().toLowerCase() === sName
+        && (r.unit||'').trim().toLowerCase() === sUnit;
+  });
+
+  if (!isPlanned && !hasReport) return '<span class="cal-cell-empty">·</span>';
+
+  if (isPlanned && hasReport) {
+    return `<span style="display:inline-block;padding:1px 4px;background:var(--green);color:#fff;font-size:9px;font-weight:700;border-radius:3px;cursor:pointer;white-space:nowrap" title="${title} ✓ Laporan masuk" onclick="${onclick}">P+A</span>`;
+  }
+
+  if (!isPlanned && hasReport) {
+    return `<span style="display:inline-block;padding:1px 5px;background:var(--teal);color:#fff;font-size:9px;font-weight:700;border-radius:3px;cursor:pointer" title="${title} ✓ Actual (di luar jadwal)" onclick="${onclick}">A</span>`;
+  }
+
+  const status = getCellStatus(s, col, year, today, reports);
+  const pColor = status === 'overdue'  ? 'var(--red)'
+               : status === 'upcoming' ? 'var(--orange)'
+               : '#4a9e3f';
+  return `<span style="display:inline-block;padding:1px 5px;background:${pColor};color:#fff;font-size:9px;font-weight:700;border-radius:3px;cursor:pointer" title="${title}" onclick="${onclick}">P</span>`;
+}
 function scheduleMatchesCell(s, col, year) {
   // For monthly/weekly periods: show in designated month+week
   const sMonth = parseInt(s.month) || 0;
@@ -1844,19 +1955,25 @@ function getWeekStartDate(year, month, week) {
 }
 
 function getCellStatus(s, col, year, today, reports) {
-  const cellEnd = getWeekStartDate(year, col.month-1, col.week);
+  const periodStart = getWeekStartDate(year, col.month-1, col.week);
+  const cellEnd = new Date(periodStart);
   cellEnd.setDate(cellEnd.getDate() + 6);
   cellEnd.setHours(23,59,59,999);
-  // Check if there's a report for this equipment in this period
-  const eqReports = reports.filter(r => {
-    if (!r.equipmentName || !r.date) return false;
-    return r.equipmentName.toLowerCase() === (s.equipment||'').toLowerCase();
-  });
-  const periodStart = getWeekStartDate(year, col.month-1, col.week);
-  const hasReport = eqReports.some(r => {
+
+  const sTag  = (s.tagNo||'').trim().toLowerCase();
+  const sName = (s.equipment||'').trim().toLowerCase();
+  const sUnit = (s.unit||'').trim().toLowerCase();
+
+  const hasReport = reports.some(r => {
+    if (!r.date) return false;
     const d = new Date(r.date);
-    return d >= periodStart && d <= cellEnd;
+    if (d < periodStart || d > cellEnd) return false;
+    if (sTag && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
+    const rName = (r.equipmentName||'').trim().toLowerCase();
+    const rUnit = (r.unit||'').trim().toLowerCase();
+    return rName === sName && rUnit === sUnit;
   });
+
   if (hasReport) return 'done';
   if (cellEnd < today) return 'overdue';
   if (cellEnd.getTime() - today.getTime() <= 7*86400000) return 'upcoming';
@@ -3211,10 +3328,28 @@ function renderResumePage() {
   }
 
   // ── KPI Summary ──────────────────────────────────────
+  const totalSP     = filtered.reduce((s,r) => s + (r.spareParts?.filter(sp=>sp?.uraian).length||0), 0);
   const totalAkt    = filtered.reduce((s,r) => s + (r.aktivitas?.length||0), 0);
   const doneAkt     = filtered.reduce((s,r) => s + (r.aktivitas?.filter(a=>a.yes||a.no_checked).length||0), 0);
-  const totalSP     = filtered.reduce((s,r) => s + (r.spareParts?.filter(sp=>sp?.uraian).length||0), 0);
-  const pctComplete = totalAkt ? Math.round(doneAkt/totalAkt*100) : 0;
+
+  // Completion rate: jumlah laporan masuk vs total schedule terdaftar
+  const allSchedules = getData(STORE.SCHEDULES);
+  const schedFiltered = allSchedules.filter(s => {
+    if (fUnit    && s.unit    !== fUnit)    return false;
+    if (fPeriode && s.periode !== fPeriode) return false;
+    return true;
+  });
+  const totalSchedule = schedFiltered.length;
+  // Pakai tagNo jika ada, fallback ke nama equipment
+  const donePMKeys = new Set(filtered.map(r => {
+    if (r.tagNo && r.tagNo.trim()) return r.tagNo.trim().toLowerCase();
+    return (r.equipmentName||'').trim().toLowerCase() + '|' + (r.unit||'').trim().toLowerCase();
+  }));
+  const schedDone = schedFiltered.filter(s => {
+    if (s.tagNo && s.tagNo.trim()) return donePMKeys.has(s.tagNo.trim().toLowerCase());
+    return donePMKeys.has((s.equipment||'').trim().toLowerCase() + '|' + (s.unit||'').trim().toLowerCase());
+  }).length;
+  const pctComplete = totalSchedule ? Math.round(schedDone / totalSchedule * 100) : 0;
   const teknisiSet  = [...new Set(filtered.map(r=>r.teknisi||'').filter(Boolean))];
   const unitSet     = [...new Set(filtered.map(r=>r.unit||'').filter(Boolean))];
 
@@ -3315,13 +3450,22 @@ function renderResumePage() {
 
   container.innerHTML = `
     <!-- KPI -->
-    <div class="stat-grid" style="margin-bottom:20px">
-      <div class="stat-card c-blue"><div class="stat-lbl">Total Laporan</div><div class="stat-val">${filtered.length}</div><div class="stat-sub">${periodLabel}</div></div>
-      <div class="stat-card c-green"><div class="stat-lbl">Total Aktivitas</div><div class="stat-val">${totalAkt}</div><div class="stat-sub">${doneAkt} selesai</div></div>
-      <div class="stat-card c-green"><div class="stat-lbl">Completion Rate</div><div class="stat-val">${pctComplete}%</div><div class="stat-sub">rata-rata checklist</div></div>
-      <div class="stat-card c-orange"><div class="stat-lbl">Spare Parts</div><div class="stat-val">${totalSP}</div><div class="stat-sub">item digunakan</div></div>
-      <div class="stat-card c-purple"><div class="stat-lbl">Teknisi</div><div class="stat-val">${teknisiSet.length}</div><div class="stat-sub">${teknisiSet.slice(0,2).join(', ')}${teknisiSet.length>2?'...':''}</div></div>
-      <div class="stat-card c-blue"><div class="stat-lbl">Unit</div><div class="stat-val">${unitSet.length}</div><div class="stat-sub">${unitSet.join(', ')||'—'}</div></div>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:20px">
+      <div class="stat-card c-blue" style="padding:20px 24px">
+        <div class="stat-lbl">Total Equipment Terdaftar</div>
+        <div class="stat-val">${totalSchedule}</div>
+        <div class="stat-sub">dari Schedule PM</div>
+      </div>
+      <div class="stat-card c-green" style="padding:20px 24px">
+        <div class="stat-lbl">Total Laporan Masuk</div>
+        <div class="stat-val">${filtered.length}</div>
+        <div class="stat-sub">${periodLabel}</div>
+      </div>
+      <div class="stat-card c-green" style="padding:20px 24px">
+        <div class="stat-lbl">Completion Rate</div>
+        <div class="stat-val" style="color:${pctComplete===100?'var(--green)':pctComplete>=60?'var(--orange)':'var(--red)'}">${pctComplete}%</div>
+        <div class="stat-sub">${schedDone}/${totalSchedule} schedule selesai</div>
+      </div>
     </div>
 
     <div style="display:grid;grid-template-columns:1.4fr 1fr${!fMonth?' 0.8fr':''};gap:14px;margin-bottom:20px">
@@ -3401,10 +3545,22 @@ function printResume() {
   const periodLabel = fYear && fMonth ? `${MONTHS_ID[fMonth-1]} ${fYear}` : fYear ? `Tahun ${fYear}` : fMonth ? MONTHS_ID[fMonth-1] : 'Semua Periode';
   const printDate = new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
 
+  const totalSP    = reports.reduce((s,r)=>s+(r.spareParts?.filter(sp=>sp?.uraian).length||0),0);
   const totalAkt   = reports.reduce((s,r)=>s+(r.aktivitas?.length||0),0);
   const doneAkt    = reports.reduce((s,r)=>s+(r.aktivitas?.filter(a=>a.yes||a.no_checked).length||0),0);
-  const totalSP    = reports.reduce((s,r)=>s+(r.spareParts?.filter(sp=>sp?.uraian).length||0),0);
-  const pct        = totalAkt ? Math.round(doneAkt/totalAkt*100) : 0;
+
+  const allSchedules = getData(STORE.SCHEDULES);
+  const schedFiltered = allSchedules.filter(s => {
+    if (fUnit    && s.unit    !== fUnit)    return false;
+    if (fPeriode && s.periode !== fPeriode) return false;
+    return true;
+  });
+  const totalSchedule = schedFiltered.length;
+  const donePMIds = new Set(reports.map(r => (r.equipmentName||'').toLowerCase() + '|' + (r.unit||'').toLowerCase()));
+  const schedDone = schedFiltered.filter(s =>
+    donePMIds.has((s.equipment||'').toLowerCase() + '|' + (s.unit||'').toLowerCase())
+  ).length;
+  const pct = totalSchedule ? Math.round(schedDone / totalSchedule * 100) : 0;
   const teknisiSet = [...new Set(reports.map(r=>r.teknisi||'').filter(Boolean))];
 
   // Per-type breakdown
@@ -3487,7 +3643,7 @@ td{padding:5px 7px;border-bottom:1px solid #ddd;font-size:8pt;vertical-align:top
 <div class="kpi-grid">
   <div class="kpi"><div class="kpi-val">${reports.length}</div><div class="kpi-lbl">Total Laporan</div></div>
   <div class="kpi"><div class="kpi-val">${totalAkt}</div><div class="kpi-lbl">Total Aktivitas</div></div>
-  <div class="kpi"><div class="kpi-val" style="color:${pct===100?'#2d7a2d':pct>=60?'#c97a00':'#b03020'}">${pct}%</div><div class="kpi-lbl">Completion Rate</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${pct===100?'#2d7a2d':pct>=60?'#c97a00':'#b03020'}">${pct}%</div><div class="kpi-lbl">Completion Rate<br><span style="font-size:7pt;font-weight:400">${schedDone}/${totalSchedule} schedule</span></div></div>
   <div class="kpi"><div class="kpi-val">${totalSP}</div><div class="kpi-lbl">Spare Parts</div></div>
   <div class="kpi"><div class="kpi-val">${teknisiSet.length}</div><div class="kpi-lbl">Teknisi</div></div>
 </div>
@@ -3518,6 +3674,469 @@ td{padding:5px 7px;border-bottom:1px solid #ddd;font-size:8pt;vertical-align:top
 }
 
 // ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+//  OUTSTANDING PAGE
+// ════════════════════════════════════════════════════════
+function clearOstFilters() {
+  ['ost-filter-period','ost-filter-unit','ost-filter-area','ost-filter-status','ost-filter-periode'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = id === 'ost-filter-period' ? 'this_week' : '';
+  });
+  renderOutstandingPage();
+}
+
+function populateOstFilters(schedules) {
+  const units = [...new Set(schedules.map(s => s.unit||'').filter(Boolean))].sort();
+  const unitSel = document.getElementById('ost-filter-unit');
+  if (unitSel) {
+    const cur = unitSel.value;
+    unitSel.innerHTML = '<option value="">Semua Unit</option>' + units.map(u=>`<option value="${u}">${u}</option>`).join('');
+    unitSel.value = cur;
+  }
+  const selUnit = unitSel?.value || '';
+  const areas = [...new Set(schedules.filter(s=>!selUnit||s.unit===selUnit).map(s=>s.area||'').filter(Boolean))].sort();
+  const areaSel = document.getElementById('ost-filter-area');
+  if (areaSel) {
+    const cur = areaSel.value;
+    areaSel.innerHTML = '<option value="">Semua Area</option>' + areas.map(a=>`<option value="${a}">${a}</option>`).join('');
+    areaSel.value = cur;
+  }
+  // Takeover filters
+  const tkoUnit = document.getElementById('tko-filter-unit');
+  if (tkoUnit) {
+    const cur = tkoUnit.value;
+    tkoUnit.innerHTML = '<option value="">Semua Unit</option>' + units.map(u=>`<option value="${u}">${u}</option>`).join('');
+    tkoUnit.value = cur;
+  }
+}
+
+function renderOutstandingPage() {
+  const schedules = getData(STORE.SCHEDULES);
+  populateOstFilters(schedules);
+
+  const periodF  = document.getElementById('ost-filter-period')?.value  || 'this_week';
+  const unitF    = document.getElementById('ost-filter-unit')?.value    || '';
+  const areaF    = document.getElementById('ost-filter-area')?.value    || '';
+  const statusF  = document.getElementById('ost-filter-status')?.value  || '';
+  const periodeF = document.getElementById('ost-filter-periode')?.value || '';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const curMonth = today.getMonth() + 1;
+  const curYear  = today.getFullYear();
+  const curWeek  = getWeekOfMonth(today);
+
+  // Week boundaries Mon–Sun
+  const day = today.getDay();
+  const diffMon = day === 0 ? -6 : 1 - day;
+  const weekStart = new Date(today); weekStart.setDate(today.getDate() + diffMon);
+  const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+
+  let candidates = schedules.filter(s => {
+    const st = getScheduleStatus(s);
+    if (st === 'done') return false; // only show non-done
+    if (unitF    && s.unit    !== unitF)    return false;
+    if (areaF    && s.area    !== areaF)    return false;
+    if (periodeF && s.periode !== periodeF) return false;
+    if (statusF  && st        !== statusF)  return false;
+    return true;
+  });
+
+  // Period filter
+  if (periodF === 'this_week') {
+    candidates = candidates.filter(s => {
+      const sMonth = parseInt(s.month) || curMonth;
+      const sWeek  = parseInt(s.week)  || 1;
+      const st     = getScheduleStatus(s);
+      // This week schedule OR overdue (always show)
+      if (st === 'overdue') return true;
+      return sMonth === curMonth && sWeek === curWeek;
+    });
+  } else if (periodF === 'this_month') {
+    candidates = candidates.filter(s => {
+      const sMonth = parseInt(s.month) || curMonth;
+      const st     = getScheduleStatus(s);
+      if (st === 'overdue') return true;
+      return sMonth === curMonth;
+    });
+  }
+
+  // Sort: overdue first, then upcoming, then by next due date
+  const order = { overdue:0, upcoming:1 };
+  candidates.sort((a,b) => {
+    const oa = order[getScheduleStatus(a)] ?? 2;
+    const ob = order[getScheduleStatus(b)] ?? 2;
+    if (oa !== ob) return oa - ob;
+    return getNextDue(a) - getNextDue(b);
+  });
+
+  // Update sidebar badge
+  const allOst = schedules.filter(s => getScheduleStatus(s) !== 'done');
+  const badge = document.getElementById('sb-outstanding-badge');
+  if (badge) {
+    badge.textContent = allOst.length;
+    badge.style.display = allOst.length ? 'inline-block' : 'none';
+  }
+
+  const countLbl = document.getElementById('ost-count-lbl');
+  if (countLbl) countLbl.textContent = `${candidates.length} item ditemukan`;
+
+  // Summary bar
+  const overdueCnt  = candidates.filter(s => getScheduleStatus(s) === 'overdue').length;
+  const upcomingCnt = candidates.filter(s => getScheduleStatus(s) === 'upcoming').length;
+  const sumBar = document.getElementById('ost-summary-bar');
+  if (sumBar) {
+    if (candidates.length) {
+      sumBar.style.display = 'block';
+      sumBar.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${overdueCnt  ? `<div style="flex:1;min-width:140px;padding:12px 16px;background:rgba(192,57,43,.07);border:1px solid rgba(192,57,43,.25);border-radius:var(--r);display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px;font-weight:800;color:var(--red)">${overdueCnt}</span>
+          <div><div style="font-size:11px;font-weight:700;color:var(--red)">OVERDUE</div><div style="font-size:10px;color:var(--text3)">melewati jadwal</div></div></div>` : ''}
+        ${upcomingCnt ? `<div style="flex:1;min-width:140px;padding:12px 16px;background:rgba(230,126,34,.07);border:1px solid rgba(230,126,34,.25);border-radius:var(--r);display:flex;align-items:center;gap:10px">
+          <span style="font-size:22px;font-weight:800;color:var(--orange)">${upcomingCnt}</span>
+          <div><div style="font-size:11px;font-weight:700;color:var(--orange)">UPCOMING</div><div style="font-size:10px;color:var(--text3)">akan jatuh tempo</div></div></div>` : ''}
+      </div>`;
+    } else {
+      sumBar.style.display = 'none';
+    }
+  }
+
+  const container = document.getElementById('outstanding-list');
+  if (!container) return;
+
+  if (!candidates.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-ico">✅</div><div class="empty-msg">Tidak ada outstanding PM untuk filter ini.</div></div>`;
+    return;
+  }
+
+  // Group by unit
+  const groups = {};
+  candidates.forEach(s => {
+    const unit = s.unit || '(Tanpa Unit)';
+    if (!groups[unit]) groups[unit] = [];
+    groups[unit].push(s);
+  });
+
+  container.innerHTML = Object.entries(groups).map(([unit, items]) => {
+    const rows = items.map(s => {
+      const status   = getScheduleStatus(s);
+      const nextDue  = getNextDue(s);
+      const diffDays = Math.floor((nextDue - today) / 86400000);
+      const nextFmt  = nextDue.toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'});
+      const lastFmt  = s.lastDone ? new Date(s.lastDone).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : '—';
+      const isOverdue = status === 'overdue';
+      const sMonth = parseInt(s.month) || curMonth;
+      const sWeek  = parseInt(s.week)  || 1;
+      const isPastMonth = isOverdue && (sMonth < curMonth || (sMonth === 12 && curMonth === 1));
+
+      const urgencyColor = isOverdue ? 'var(--red)' : 'var(--orange)';
+      const urgencyBg    = isOverdue ? 'rgba(192,57,43,.06)' : 'rgba(230,126,34,.06)';
+      const urgencyBorder= isOverdue ? 'rgba(192,57,43,.25)' : 'rgba(230,126,34,.2)';
+      const diffLabel    = isOverdue
+        ? `<strong style="color:var(--red)">⚠ ${Math.abs(diffDays)} hari telat</strong>`
+        : `<span style="color:var(--orange)">◎ ${diffDays} hari lagi</span>`;
+
+      return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);background:${urgencyBg};border-left:3px solid ${urgencyColor};margin-bottom:2px;border-radius:0 5px 5px 0">
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span style="font-weight:700;font-size:13px">${s.equipment}</span>
+            ${s.tagNo?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent)">${s.tagNo}</span>`:''}
+            <span class="badge ${isOverdue?'b-overdue':'b-upcoming'}">${isOverdue?'OVERDUE':'UPCOMING'}</span>
+            ${isPastMonth?`<span class="badge" style="background:rgba(230,126,34,.15);color:var(--orange);border:1px solid rgba(230,126,34,.3);font-size:9px">PAST MONTH</span>`:''}
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:3px">
+            📍 ${s.area||'—'} &nbsp;·&nbsp; 🔄 ${s.periode} &nbsp;·&nbsp; 📅 ${MONTHS_ID[(sMonth)-1]} W${sWeek}
+            ${s.pic?`&nbsp;·&nbsp; 👤 ${s.pic}`:''}
+          </div>
+          <div style="font-size:11px;margin-top:4px;display:flex;gap:16px;flex-wrap:wrap">
+            <span>${diffLabel}</span>
+            <span style="color:var(--text3)">Next: ${nextFmt}</span>
+            <span style="color:var(--text3)">Terakhir: ${lastFmt}</span>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0">
+          <button class="btn-primary" style="font-size:11px;padding:6px 12px" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>
+          ${isPastMonth
+            ? `<button class="btn-orange" style="font-size:11px;padding:6px 12px" onclick="openTakeoverModal('${s.id}')">🔄 Takeover</button>`
+            : `<button class="btn-ghost" style="font-size:11px;padding:6px 12px" onclick="markPMDone('${s.id}')">✓ Mark Done</button>`}
+        </div>
+      </div>`;
+    }).join('');
+
+    const unitOverdue = items.filter(s=>getScheduleStatus(s)==='overdue').length;
+    return `<div style="margin-bottom:14px">
+      <div style="padding:8px 14px;background:var(--navy);border-radius:var(--r) var(--r) 0 0;display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px">🏭</span>
+        <span style="font-weight:700;color:#fff;font-size:13px;flex:1">${unit}</span>
+        ${unitOverdue ? `<span class="badge b-overdue" style="font-size:9px">⚠ ${unitOverdue} overdue</span>` : ''}
+        <span style="font-size:11px;color:rgba(255,255,255,.5)">${items.length} item</span>
+      </div>
+      <div style="border:1px solid var(--border);border-top:none;border-radius:0 0 var(--r) var(--r);overflow:hidden">${rows}</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════
+//  TAKEOVER PM PAGE
+// ════════════════════════════════════════════════════════
+function clearTkoFilters() {
+  ['tko-filter-unit','tko-filter-area','tko-filter-periode'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderTakeoverPage();
+}
+
+function renderTakeoverPage() {
+  const schedules = getData(STORE.SCHEDULES);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const curMonth = today.getMonth() + 1;
+  const curYear  = today.getFullYear();
+
+  // Populate filters
+  const units = [...new Set(schedules.map(s=>s.unit||'').filter(Boolean))].sort();
+  const tkoUnit = document.getElementById('tko-filter-unit');
+  if (tkoUnit) {
+    const cur = tkoUnit.value;
+    tkoUnit.innerHTML = '<option value="">Semua Unit</option>' + units.map(u=>`<option value="${u}">${u}</option>`).join('');
+    tkoUnit.value = cur;
+  }
+  const selUnit = tkoUnit?.value || '';
+  const areas = [...new Set(schedules.filter(s=>!selUnit||s.unit===selUnit).map(s=>s.area||'').filter(Boolean))].sort();
+  const tkoArea = document.getElementById('tko-filter-area');
+  if (tkoArea) {
+    const cur = tkoArea.value;
+    tkoArea.innerHTML = '<option value="">Semua Area</option>' + areas.map(a=>`<option value="${a}">${a}</option>`).join('');
+    tkoArea.value = cur;
+  }
+
+  const unitF    = tkoUnit?.value    || '';
+  const areaF    = tkoArea?.value    || '';
+  const periodeF = document.getElementById('tko-filter-periode')?.value || '';
+
+  // Past-month overdue: schedule month < current month (or last year)
+  const pastMonth = schedules.filter(s => {
+    const sMonth = parseInt(s.month) || 0;
+    const st     = getScheduleStatus(s);
+    if (st !== 'overdue') return false;
+    if (!sMonth) return false;
+    // Past month = scheduled month is strictly before current month (same year context)
+    const isPast = sMonth < curMonth || (sMonth > curMonth && sMonth >= 10 && curMonth <= 3); // cross-year
+    if (!isPast) return false;
+    if (unitF    && s.unit    !== unitF)    return false;
+    if (areaF    && s.area    !== areaF)    return false;
+    if (periodeF && s.periode !== periodeF) return false;
+    return true;
+  });
+
+  // Sidebar badge
+  const badge = document.getElementById('sb-takeover-badge');
+  if (badge) {
+    badge.textContent = pastMonth.length;
+    badge.style.display = pastMonth.length ? 'inline-block' : 'none';
+  }
+
+  const container = document.getElementById('takeover-list');
+  if (!container) return;
+
+  if (!pastMonth.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-ico">✅</div><div class="empty-msg">Tidak ada PM yang perlu di-takeover.<br><span style="font-size:12px">PM takeover muncul ketika jadwal sudah melewati bulannya.</span></div></div>`;
+    return;
+  }
+
+  const nowMonLabel = MONTHS_ID[curMonth - 1];
+
+  container.innerHTML = `
+    <div style="margin-bottom:14px;padding:12px 16px;background:rgba(230,126,34,.07);border:1px solid rgba(230,126,34,.3);border-radius:var(--r)">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--orange);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">ℹ Tentang Takeover PM</div>
+      <div style="font-size:12px;color:var(--text2)">Takeover memindahkan jadwal PM yang terlewat ke <strong>${nowMonLabel} ${curYear}</strong> (bulan ini). Schedule lama akan diperbarui ke bulan & minggu baru agar tidak hilang dari radar.</div>
+    </div>
+    ${pastMonth.map(s => {
+      const sMonth   = parseInt(s.month) || curMonth;
+      const sWeek    = parseInt(s.week)  || 1;
+      const nextDue  = getNextDue(s);
+      const diffDays = Math.floor((today - nextDue) / 86400000);
+      const lastFmt  = s.lastDone ? new Date(s.lastDone).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}) : 'Belum pernah';
+
+      return `<div style="background:var(--bg2);border:1px solid rgba(230,126,34,.3);border-left:3px solid var(--orange);border-radius:var(--r);padding:14px 16px;margin-bottom:8px">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+              <span style="font-weight:700;font-size:14px">${s.equipment}</span>
+              ${s.tagNo?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--accent)">${s.tagNo}</span>`:''}
+              <span class="badge b-overdue">OVERDUE ${diffDays}h</span>
+            </div>
+            <div style="font-size:12px;color:var(--text2);margin-bottom:4px">
+              🏭 ${s.unit||'—'} &nbsp;·&nbsp; 📍 ${s.area||'—'} &nbsp;·&nbsp; 🔄 ${s.periode}
+              ${s.pic?`&nbsp;·&nbsp; 👤 ${s.pic}`:''}
+            </div>
+            <div style="display:flex;gap:16px;font-size:11px;color:var(--text3);flex-wrap:wrap">
+              <span>📅 Dijadwalkan: <strong style="color:var(--orange)">${MONTHS_ID[sMonth-1]} Minggu ${sWeek}</strong></span>
+              <span>Terakhir PM: <strong>${lastFmt}</strong></span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;min-width:140px">
+            <button class="btn-orange" style="font-size:11px;padding:7px 14px;width:100%" onclick="openTakeoverModal('${s.id}')">🔄 Takeover ke Bulan Ini</button>
+            <button class="btn-primary" style="font-size:11px;padding:7px 14px;width:100%" onclick="eksekusiPM('${s.id}')">▶ Eksekusi Langsung</button>
+            <button class="btn-ghost" style="font-size:11px;padding:5px 14px;width:100%" onclick="markPMDone('${s.id}')">✓ Mark Done (skip)</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}`;
+}
+
+// ════════════════════════════════════════════════════════
+//  TAKEOVER MODAL & ACTION
+// ════════════════════════════════════════════════════════
+function openTakeoverModal(schedId) {
+  const s = getData(STORE.SCHEDULES).find(x => x.id === schedId);
+  if (!s) return;
+  const today    = new Date();
+  const curMonth = today.getMonth() + 1;
+  const curWeek  = getWeekOfMonth(today);
+  const sMonth   = parseInt(s.month) || curMonth;
+  const sWeek    = parseInt(s.week)  || 1;
+
+  const info = `
+    <div style="margin-bottom:12px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:7px">
+      <div style="font-weight:600;font-size:13px">${s.equipment}</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:3px">
+        ${s.unit||'—'} · ${s.area||'—'} · ${s.periode}<br>
+        Jadwal lama: <strong style="color:var(--orange)">${MONTHS_ID[sMonth-1]} Minggu ${sWeek}</strong>
+      </div>
+    </div>
+    <div class="form-grid">
+      <div class="fg">
+        <span class="flabel">Pindah ke Bulan *</span>
+        <select class="fsel2" id="tko-new-month">
+          ${MONTHS_ID.map((m,i)=>`<option value="${i+1}" ${i+1===curMonth?'selected':''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg">
+        <span class="flabel">Minggu Ke *</span>
+        <select class="fsel2" id="tko-new-week">
+          ${[1,2,3,4,5].map(w=>`<option value="${w}" ${w===curWeek?'selected':''}>${w}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg full">
+        <span class="flabel">Alasan Takeover</span>
+        <textarea class="ftextarea" id="tko-reason" rows="2" placeholder="Contoh: Tidak ada teknisi tersedia di minggu tsb, mesin sedang beroperasi penuh..."></textarea>
+      </div>
+    </div>`;
+
+  document.getElementById('delete-confirm-msg').innerHTML = info;
+  document.getElementById('delete-confirm-btn').textContent = '🔄 TAKEOVER';
+  document.getElementById('delete-confirm-btn').className = 'btn-orange';
+  document.getElementById('delete-confirm-btn').onclick = () => executeTakeover(schedId);
+  openOverlay('deleteOverlay');
+}
+
+function executeTakeover(schedId) {
+  const schedules = getData(STORE.SCHEDULES);
+  const s = schedules.find(x => x.id === schedId);
+  if (!s) return;
+
+  const newMonth = parseInt(document.getElementById('tko-new-month')?.value);
+  const newWeek  = parseInt(document.getElementById('tko-new-week')?.value);
+  const reason   = document.getElementById('tko-reason')?.value?.trim() || '';
+
+  if (!newMonth || !newWeek) { toast('Pilih bulan dan minggu tujuan','error'); return; }
+
+  const oldMonth = s.month;
+  const oldWeek  = s.week;
+  s.month      = newMonth;
+  s.week       = newWeek;
+  s.takeoverAt = new Date().toISOString();
+  s.takeoverFrom = `${MONTHS_ID[(oldMonth||1)-1]} W${oldWeek}`;
+  s.takeoverReason = reason;
+
+  setData(STORE.SCHEDULES, schedules);
+  closeOverlay('deleteOverlay');
+
+  // Reset delete button
+  document.getElementById('delete-confirm-btn').textContent = '🗑 HAPUS';
+  document.getElementById('delete-confirm-btn').className = 'btn-red';
+
+  renderTakeoverPage();
+  renderOutstandingPage();
+  renderScheduleList();
+  renderDashboard();
+  updateSidebarBadges();
+  toast(`🔄 PM "${s.equipment}" berhasil di-takeover ke ${MONTHS_ID[newMonth-1]} Minggu ${newWeek}`, 'success');
+
+  if (!SHEETS_URL.includes('GANTI_DENGAN')) {
+    api('updateSchedule', { schedule: s }).catch(() => {});
+  }
+}
+
+function bulkTakeover() {
+  const schedules = getData(STORE.SCHEDULES);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const curMonth = today.getMonth() + 1;
+  const curWeek  = getWeekOfMonth(today);
+  const unitF    = document.getElementById('tko-filter-unit')?.value  || '';
+  const areaF    = document.getElementById('tko-filter-area')?.value  || '';
+  const periodeF = document.getElementById('tko-filter-periode')?.value || '';
+
+  const toTakeover = schedules.filter(s => {
+    const sMonth = parseInt(s.month) || 0;
+    const st     = getScheduleStatus(s);
+    if (st !== 'overdue') return false;
+    if (!sMonth || sMonth >= curMonth) return false;
+    if (unitF    && s.unit    !== unitF)    return false;
+    if (areaF    && s.area    !== areaF)    return false;
+    if (periodeF && s.periode !== periodeF) return false;
+    return true;
+  });
+
+  if (!toTakeover.length) { toast('Tidak ada yang perlu di-takeover','info'); return; }
+
+  document.getElementById('delete-confirm-msg').innerHTML = `
+    <div style="color:var(--text2)">Takeover <strong>${toTakeover.length} schedule</strong> ke <strong>${MONTHS_ID[curMonth-1]} Minggu ${curWeek}</strong>?</div>
+    <div style="font-size:12px;color:var(--text3);margin-top:8px">${toTakeover.map(s=>s.equipment).join(', ')}</div>`;
+  document.getElementById('delete-confirm-btn').textContent = '🔄 TAKEOVER SEMUA';
+  document.getElementById('delete-confirm-btn').className = 'btn-orange';
+  document.getElementById('delete-confirm-btn').onclick = () => {
+    toTakeover.forEach(s => {
+      const oldMonth = s.month; const oldWeek = s.week;
+      s.month = curMonth; s.week = curWeek;
+      s.takeoverAt = new Date().toISOString();
+      s.takeoverFrom = `${MONTHS_ID[(oldMonth||1)-1]} W${oldWeek}`;
+      s.takeoverReason = 'Bulk takeover';
+      if (!SHEETS_URL.includes('GANTI_DENGAN')) {
+        api('updateSchedule', { schedule: s }).catch(() => {});
+      }
+    });
+    setData(STORE.SCHEDULES, schedules);
+    closeOverlay('deleteOverlay');
+    document.getElementById('delete-confirm-btn').textContent = '🗑 HAPUS';
+    document.getElementById('delete-confirm-btn').className = 'btn-red';
+    renderTakeoverPage();
+    renderOutstandingPage();
+    renderScheduleList();
+    renderDashboard();
+    updateSidebarBadges();
+    toast(`🔄 ${toTakeover.length} schedule di-takeover ke ${MONTHS_ID[curMonth-1]} Minggu ${curWeek}`, 'success');
+  };
+  openOverlay('deleteOverlay');
+}
+
+function updateSidebarBadges() {
+  const schedules  = getData(STORE.SCHEDULES);
+  const today      = new Date(); today.setHours(0,0,0,0);
+  const curMonth   = today.getMonth() + 1;
+
+  const allOst = schedules.filter(s => getScheduleStatus(s) !== 'done');
+  const ostBadge = document.getElementById('sb-outstanding-badge');
+  if (ostBadge) { ostBadge.textContent = allOst.length; ostBadge.style.display = allOst.length ? 'inline-block' : 'none'; }
+
+  const pastMonth = schedules.filter(s => {
+    const sMonth = parseInt(s.month) || 0;
+    const st     = getScheduleStatus(s);
+    return st === 'overdue' && sMonth > 0 && sMonth < curMonth;
+  });
+  const tkoBadge = document.getElementById('sb-takeover-badge');
+  if (tkoBadge) { tkoBadge.textContent = pastMonth.length; tkoBadge.style.display = pastMonth.length ? 'inline-block' : 'none'; }
+}
+
 window.addEventListener('load', () => {
   applyLocalTemplates(); // Load custom templates on start
   document.getElementById('pm-date').value = new Date().toISOString().split('T')[0];
@@ -3535,12 +4154,13 @@ window.addEventListener('load', () => {
   } else if (SHEETS_URL.includes('GANTI_DENGAN')) {
     setSyncStatus('offline','Mode Offline — Atur SHEETS_URL');
   } else {
-    setSyncStatus('syncing','Menghubungkan...');
-    syncFromSheets();
+    // Hanya cek koneksi, TIDAK pull data otomatis
+    setSyncStatus('offline','Data lokal — klik Sync untuk ambil data terbaru');
   }
 
   renderDashboard();
   populateUnitFilters();
+  updateSidebarBadges();
 });
 // ════════════════════════════════════════════════════════
 //  WORK ORDER — dari laporan PM (semua anomali → 1 WO)
