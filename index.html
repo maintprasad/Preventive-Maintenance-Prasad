@@ -390,12 +390,12 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
     <button class="sb-item" data-page="resume" onclick="showPage('resume');renderResumePage()">
       <span class="sb-icon">📊</span>Resume Laporan
     </button>
+  </div>
   <div class="sb-section">
     <div class="sb-label">Pengaturan</div>
     <button class="sb-item" data-page="templates" onclick="showPage('templates');loadTemplatePage()">
       <span class="sb-icon">🛠</span>Kelola Template PM
     </button>
-  </div>
   </div>
 </aside>
 
@@ -1449,9 +1449,12 @@ function renderDashboard() {
             <div style="font-size:11px;color:var(--text3)">${s.unit||''} · ${s.area||''} · ${s.periode}</div>
           </div>
         </div>
-        <div style="text-align:right;flex-shrink:0;margin-left:12px">
-          <div style="font-size:12px;font-weight:700;color:${color}">${diff===0?'HARI INI':diff+' hari lagi'}</div>
-          <div style="font-size:10px;color:var(--text3)">${next.toLocaleDateString('id-ID',{day:'numeric',month:'short'})}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:12px">
+          <div style="text-align:right">
+            <div style="font-size:12px;font-weight:700;color:${color}">${diff===0?'HARI INI':diff+' hari lagi'}</div>
+            <div style="font-size:10px;color:var(--text3)">${next.toLocaleDateString('id-ID',{day:'numeric',month:'short'})}</div>
+          </div>
+          <button class="btn-primary" style="font-size:10px;padding:5px 10px;white-space:nowrap" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>
         </div>
       </div>`;
     }).join('');
@@ -1538,7 +1541,10 @@ function renderWeekTarget(schedules, reports) {
         <div class="week-item-name">${s.equipment}</div>
         <div class="week-item-meta">${s.unit||''}${s.area?' · '+s.area:''} · ${s.periode}${overdueMeta}</div>
       </div>
-      <span class="week-item-badge ${badgeInfo[0]}">${badgeInfo[1]}</span>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <span class="week-item-badge ${badgeInfo[0]}">${badgeInfo[1]}</span>
+        ${status !== 'done' ? `<button style="background:rgba(74,158,63,.25);border:1px solid rgba(74,158,63,.4);color:#7ddf6e;font-family:'IBM Plex Mono',monospace;font-size:10px;padding:3px 9px;border-radius:4px;cursor:pointer;white-space:nowrap" onclick="eksekusiPM('${s.id}')">▶</button>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
@@ -1997,6 +2003,12 @@ async function submitPM() {
 
   setData(STORE.REPORTS, reports);
   updateScheduleLastDone(data.equipmentName, data.date);
+
+  // Jika berasal dari eksekusi schedule langsung, mark done sekalian
+  if (window._activeScheduleId && !isEdit) {
+    await markPMDone(window._activeScheduleId);
+    window._activeScheduleId = null;
+  }
   renderDashboard();
   renderReportList();
   populateUnitFilters();
@@ -2063,6 +2075,7 @@ function updateScheduleLastDone(equipName, date) {
 }
 
 function editReport(id) {
+  window._activeScheduleId = null;
   const r = getData(STORE.REPORTS).find(x => x.id === id);
   if (!r) { toast('Laporan tidak ditemukan', 'error'); return; }
 
@@ -2137,7 +2150,44 @@ function editReport(id) {
   toast('📝 Mode edit — perbarui checklist lalu klik SUBMIT', 'info');
 }
 
-function clearPMForm() {
+function eksekusiPM(scheduleId) {
+  const s = getData(STORE.SCHEDULES).find(x => x.id === scheduleId);
+  if (!s) { toast('Schedule tidak ditemukan', 'error'); return; }
+
+  // Reset form dulu
+  clearPMForm(true);
+
+  // Pre-fill dari data schedule
+  const el = id => document.getElementById(id);
+  if (el('pm-tagno'))          el('pm-tagno').value          = s.tagNo || '';
+  if (el('pm-equipment-name')) el('pm-equipment-name').value = s.equipment || '';
+  if (el('pm-unit'))           el('pm-unit').value           = s.unit || '';
+  if (el('pm-area'))           el('pm-area').value           = s.area || '';
+  if (el('pm-periode'))        el('pm-periode').value        = s.periode || 'Monthly';
+  if (el('pm-teknisi'))        el('pm-teknisi').value        = s.pic || '';
+
+  // Set tanggal ke hari ini
+  el('pm-date').value = new Date().toISOString().split('T')[0];
+  el('pm-week').value = getWeekOfMonth(new Date());
+
+  // Set equipment type dan langsung load template checklist
+  if (s.equipmentType && el('pm-equipment-type')) {
+    el('pm-equipment-type').value = s.equipmentType;
+    loadPMTemplate();
+  }
+
+  // Simpan referensi schedule agar updateScheduleLastDone bisa otomatis
+  window._activeScheduleId = scheduleId;
+
+  showPage('reports');
+  toast(`▶ Eksekusi PM: ${s.equipment} — form sudah diisi otomatis`, 'success');
+
+  // Scroll ke atas form
+  setTimeout(() => el('page-reports')?.scrollIntoView({ behavior: 'smooth' }), 150);
+}
+
+
+function clearPMForm(silent = false) {
   ['pm-tagno','pm-equipment-name','pm-unit','pm-area','pm-teknisi','pm-approval','pm-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value='';
   });
@@ -2161,7 +2211,8 @@ function clearPMForm() {
   // Reset edit mode
   document.getElementById('pm-edit-id').value = '';
   document.getElementById('pm-edit-banner').style.display = 'none';
-  toast('Form direset','info');
+  if (!silent) window._activeScheduleId = null;
+  if (!silent) toast('Form direset','info');
 }
 
 // ════════════════════════════════════════════════════════
@@ -2462,6 +2513,7 @@ function renderScheduleList() {
               <div style="color:var(--text3)">Terakhir: ${lastFmt}</div>
             </div>
             <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">
+              <button class="tbl-btn" style="border-color:rgba(74,158,63,.4);color:var(--green2);font-weight:600" onmouseover="this.style.background='rgba(74,158,63,.08)'" onmouseout="this.style.background=''" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>
               <button class="tbl-btn" onclick="openScheduleModal('${s.id}')">✏</button>
               <button class="tbl-btn" onclick="markPMDone('${s.id}')">✓</button>
               <button class="tbl-btn del" onclick="deleteSchedule('${s.id}')">🗑</button>
