@@ -1277,22 +1277,13 @@ async function syncFromSheets() {
   try {
     const [schRes, repRes] = await Promise.all([api('getSchedules'), api('getReports')]);
 
-    // BUG FIX #4: merge data dari Sheets dengan data lokal
-    // Data lokal yang ID-nya belum ada di Sheets (belum tersync) → tidak ikut terhapus
+    // Hanya pakai data dari Sheets — timpa localStorage sepenuhnya
     if (schRes.success && Array.isArray(schRes.schedules)) {
-      const localSchedules = getData(STORE.SCHEDULES);
-      const sheetsIds = new Set(schRes.schedules.map(s => s.id));
-      // Ambil item lokal yang ID-nya belum ada di Sheets (pending sync)
-      const pendingLocal = localSchedules.filter(s => !sheetsIds.has(s.id));
-      // Merge: data Sheets (sumber kebenaran) + pending lokal
-      setData(STORE.SCHEDULES, [...schRes.schedules, ...pendingLocal]);
+      setData(STORE.SCHEDULES, schRes.schedules);
     }
 
     if (repRes.success && Array.isArray(repRes.reports)) {
-      const localReports = getData(STORE.REPORTS);
-      const sheetsIds = new Set(repRes.reports.map(r => r.id));
-      const pendingLocal = localReports.filter(r => !sheetsIds.has(r.id));
-      setData(STORE.REPORTS, [...repRes.reports, ...pendingLocal]);
+      setData(STORE.REPORTS, repRes.reports);
     }
 
     setSyncStatus('online','Tersinkron ' + new Date().toLocaleTimeString('id-ID'));
