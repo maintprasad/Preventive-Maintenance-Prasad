@@ -421,30 +421,69 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
     </div>
   </div>
 
-  <!-- 3 KPI Utama -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px">
+  <!-- KPI per Unit -->
+  <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
 
-    <div style="background:var(--navy);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Completion Rate</div>
-      <div style="font-size:42px;font-weight:800;color:#fff;line-height:1" id="kpi-completion">—</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:6px" id="kpi-completion-sub">— schedule selesai</div>
-      <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.1)">
-        <div id="kpi-completion-bar" style="height:100%;background:var(--green);transition:width .5s ease;width:0%"></div>
+    <!-- Unit 1 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+
+      <div style="background:var(--navy);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Unit 1</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Completion Rate</div>
+        <div style="font-size:42px;font-weight:800;color:#fff;line-height:1" id="kpi-u1-completion">—</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:6px" id="kpi-u1-completion-sub">— schedule selesai</div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.1)">
+          <div id="kpi-u1-completion-bar" style="height:100%;background:var(--green);transition:width .5s ease;width:0%"></div>
+        </div>
       </div>
+
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Unit 1</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Overdue</div>
+        <div style="font-size:42px;font-weight:800;line-height:1;color:var(--red)" id="kpi-u1-overdue">—</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">PM melewati jadwal</div>
+        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--red)"></div>
+      </div>
+
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Unit 1</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Upcoming</div>
+        <div style="font-size:42px;font-weight:800;line-height:1;color:var(--orange)" id="kpi-u1-upcoming">—</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">PM akan jatuh tempo</div>
+        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--orange)"></div>
+      </div>
+
     </div>
 
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Overdue</div>
-      <div style="font-size:42px;font-weight:800;line-height:1;color:var(--red)" id="kpi-overdue">—</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:6px">PM melewati jadwal</div>
-      <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--red)"></div>
-    </div>
+    <!-- Unit 2 -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
 
-    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
-      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Upcoming</div>
-      <div style="font-size:42px;font-weight:800;line-height:1;color:var(--orange)" id="kpi-upcoming">—</div>
-      <div style="font-size:12px;color:var(--text3);margin-top:6px">PM akan jatuh tempo</div>
-      <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--orange)"></div>
+      <div style="background:var(--navy);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:rgba(255,255,255,.35);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Unit 2</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Completion Rate</div>
+        <div style="font-size:42px;font-weight:800;color:#fff;line-height:1" id="kpi-u2-completion">—</div>
+        <div style="font-size:12px;color:rgba(255,255,255,.5);margin-top:6px" id="kpi-u2-completion-sub">— schedule selesai</div>
+        <div style="position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,.1)">
+          <div id="kpi-u2-completion-bar" style="height:100%;background:var(--green);transition:width .5s ease;width:0%"></div>
+        </div>
+      </div>
+
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Unit 2</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Overdue</div>
+        <div style="font-size:42px;font-weight:800;line-height:1;color:var(--red)" id="kpi-u2-overdue">—</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">PM melewati jadwal</div>
+        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--red)"></div>
+      </div>
+
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:22px 24px;position:relative;overflow:hidden">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:2px">Unit 2</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px">Upcoming</div>
+        <div style="font-size:42px;font-weight:800;line-height:1;color:var(--orange)" id="kpi-u2-upcoming">—</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:6px">PM akan jatuh tempo</div>
+        <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--orange)"></div>
+      </div>
+
     </div>
 
   </div>
@@ -1454,33 +1493,45 @@ function renderDashboard() {
   const schedules = getData(STORE.SCHEDULES);
   const today = new Date(); today.setHours(0,0,0,0);
 
-  const overdue = schedules.filter(s => getScheduleStatus(s) === 'overdue');
-  const upcoming = schedules.filter(s => getScheduleStatus(s) === 'upcoming');
-  const doneMonth = reports.filter(r => {
-    if (!r.date) return false;
-    const d = new Date(r.date);
-    return d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
-  });
-
-  // Completion rate: schedule yang sudah dilaporkan bulan ini
   const donePMKeys = new Set(reports.map(r => {
     if (r.tagNo && r.tagNo.trim()) return r.tagNo.trim().toLowerCase();
     return (r.equipmentName||'').trim().toLowerCase() + '|' + (r.unit||'').trim().toLowerCase();
   }));
-  const schedDone = schedules.filter(s => {
-    if (s.tagNo && s.tagNo.trim()) return donePMKeys.has(s.tagNo.trim().toLowerCase());
-    return donePMKeys.has((s.equipment||'').trim().toLowerCase() + '|' + (s.unit||'').trim().toLowerCase());
-  }).length;
-  const pct = schedules.length ? Math.round(schedDone / schedules.length * 100) : 0;
 
-  setText('kpi-completion', pct + '%');
-  setText('kpi-completion-sub', `${schedDone} dari ${schedules.length} schedule selesai`);
-  setText('kpi-overdue', overdue.length);
-  setText('kpi-upcoming', upcoming.length);
+  function calcKPI(unitName) {
+    const sch = schedules.filter(s => (s.unit||'') === unitName);
+    const overdue  = sch.filter(s => getScheduleStatus(s) === 'overdue').length;
+    const upcoming = sch.filter(s => getScheduleStatus(s) === 'upcoming').length;
+    const done = sch.filter(s => {
+      if (s.tagNo && s.tagNo.trim()) return donePMKeys.has(s.tagNo.trim().toLowerCase());
+      return donePMKeys.has((s.equipment||'').trim().toLowerCase() + '|' + (s.unit||'').trim().toLowerCase());
+    }).length;
+    const pct = sch.length ? Math.round(done / sch.length * 100) : 0;
+    return { overdue, upcoming, done, total: sch.length, pct };
+  }
+
+  const u1 = calcKPI('Unit 1');
+  const u2 = calcKPI('Unit 2');
+
+  setText('kpi-u1-completion',     u1.pct + '%');
+  setText('kpi-u1-completion-sub', `${u1.done} dari ${u1.total} schedule selesai`);
+  setText('kpi-u1-overdue',        u1.overdue);
+  setText('kpi-u1-upcoming',       u1.upcoming);
+  const bar1 = document.getElementById('kpi-u1-completion-bar');
+  if (bar1) bar1.style.width = u1.pct + '%';
+
+  setText('kpi-u2-completion',     u2.pct + '%');
+  setText('kpi-u2-completion-sub', `${u2.done} dari ${u2.total} schedule selesai`);
+  setText('kpi-u2-overdue',        u2.overdue);
+  setText('kpi-u2-upcoming',       u2.upcoming);
+  const bar2 = document.getElementById('kpi-u2-completion-bar');
+  if (bar2) bar2.style.width = u2.pct + '%';
+
   setText('dashboardDate', 'Update: ' + new Date().toLocaleString('id-ID'));
 
-  const bar = document.getElementById('kpi-completion-bar');
-  if (bar) bar.style.width = pct + '%';
+  // Untuk keperluan chart (tetap pakai semua schedule)
+  const overdue  = schedules.filter(s => getScheduleStatus(s) === 'overdue');
+  const upcoming = schedules.filter(s => getScheduleStatus(s) === 'upcoming');
 
   // Overdue alert
   const alertDiv = document.getElementById('overdue-alert');
