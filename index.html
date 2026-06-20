@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no"/>
 <title>Prasad Seeds — Preventive Maintenance</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -16,8 +16,8 @@
   --r:8px;--shadow:0 4px 16px rgba(26,58,107,.1);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-height:100vh}
+html{scroll-behavior:smooth;overflow-x:hidden;width:100%}
+body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-serif;font-size:14px;min-height:100vh;overflow-x:hidden;width:100%;max-width:100vw;position:relative}
 ::-webkit-scrollbar{width:5px;height:5px}
 ::-webkit-scrollbar-track{background:var(--bg2)}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
@@ -39,7 +39,7 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
 
 /* ── LAYOUT ── */
-.layout{display:flex;min-height:calc(100vh - 56px)}
+.layout{display:flex;min-height:calc(100vh - 56px);max-width:100vw;overflow-x:hidden}
 .sidebar{width:210px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);padding:16px 0;overflow-y:auto;transition:transform .28s cubic-bezier(.4,0,.2,1)}
 .sb-section{padding:0 12px;margin-bottom:18px}
 .sb-label{font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--text3);letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;padding:0 6px}
@@ -48,7 +48,7 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
 .sb-item:hover{background:var(--green-light);color:var(--green2)}
 .sb-item.active{color:var(--navy);background:var(--green-light);font-weight:600;border-left:3px solid var(--green)}
 .sb-icon{font-size:15px;width:20px;text-align:center;flex-shrink:0}
-.content{flex:1;padding:22px;overflow:auto;background:var(--bg)}
+.content{flex:1;padding:22px;overflow-y:auto;overflow-x:hidden;background:var(--bg);max-width:100%}
 
 /* ── PAGE SWITCH ── */
 .page{display:none}.page.active{display:block}
@@ -351,6 +351,24 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
 .mnav-ico-wrap{padding:2px 8px;transition:background .15s}
 
 @media(max-width:768px){
+  /* Cegah overflow horizontal di seluruh halaman */
+  html, body{
+    overflow-x:hidden !important;
+    width:100%;
+    max-width:100vw;
+  }
+  .content, .layout, .page, .section-card, .chart-grid, .stat-grid,
+  .form-grid, .toolbar, .sec-hdr, #dash-top-grid{
+    max-width:100%;
+    overflow-x:hidden;
+  }
+  /* Hanya wrapper tabel & calendar yang boleh scroll horizontal */
+  .tbl-wrap, .cal-wrap{
+    max-width:100%;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+  }
+
   /* Sidebar slide-in */
   .sidebar{
     display:block;position:fixed;top:56px;left:0;bottom:0;z-index:400;
@@ -425,6 +443,18 @@ body{background:var(--bg);color:var(--text);font-family:'IBM Plex Sans',sans-ser
     display:grid !important;
     grid-template-columns:1fr 1fr !important;
     gap:8px !important;
+  }
+  #page-dashboard [style*="grid-template-columns:repeat(4,1fr)"]{
+    display:grid !important;
+    grid-template-columns:1fr 1fr !important;
+    gap:0 !important;
+  }
+  #page-resume [style*="grid-template-columns:repeat(3,1fr)"],
+  #page-resume [style*="grid-template-columns:1.4fr 1fr"],
+  #page-resume [style*="grid-template-columns:1.4fr 1fr 0.8fr"]{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:10px !important;
   }
 
   /* Dashboard top grid stack */
@@ -582,6 +612,52 @@ button,select,input{touch-action:manipulation}
 }
 @media(max-width:400px){
   #cal-month-pills{grid-template-columns:repeat(3,1fr)}
+}
+
+/* ── GANTT-STYLE WEEKLY CALENDAR ── */
+.gantt-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r)}
+.gantt-legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2)}
+.gantt-legend-dot{width:13px;height:13px;border-radius:4px;flex-shrink:0}
+.gantt-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.gantt-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.gantt-table{border-collapse:collapse;width:100%;min-width:640px}
+.gantt-table thead th{background:var(--navy);color:#fff;font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:9px 6px;text-align:center;border-bottom:2px solid var(--green);white-space:nowrap}
+.gantt-table thead th.gantt-eq-hdr{text-align:left;padding-left:14px;position:sticky;left:0;z-index:3;background:var(--navy)}
+.gantt-table tbody td{border:1px solid var(--border);padding:0;text-align:center;vertical-align:middle;background:var(--bg2);height:46px}
+.gantt-eq-cell{
+  text-align:left !important;padding:8px 14px !important;position:sticky;left:0;z-index:2;
+  background:var(--bg2);border-right:2px solid var(--border) !important;min-width:190px;max-width:240px;
+}
+.gantt-eq-name{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)}
+.gantt-eq-sub{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.gantt-group-row td{background:var(--bg3) !important;padding:6px 14px !important;font-weight:700;font-size:11.5px;color:var(--navy);text-align:left !important;border-right:none !important}
+.gantt-week-cell{position:relative;height:46px}
+.gantt-pill{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:28px;height:28px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:700;line-height:1;cursor:pointer;color:#fff;
+}
+.gantt-pill.done{background:#4a9e3f}
+.gantt-pill.overdue{background:#c0392b}
+.gantt-pill.upcoming{background:#e67e22}
+.gantt-dot-empty{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:6px;height:6px;border-radius:50%;background:#c9d6c9;
+}
+
+/* Popup detail sel */
+.gantt-popup-overlay{display:none;position:fixed;inset:0;z-index:600;background:rgba(26,58,107,.35);align-items:center;justify-content:center;padding:16px}
+.gantt-popup-overlay.open{display:flex}
+.gantt-popup{background:var(--bg2);border:1px solid var(--border);border-radius:12px;max-width:360px;width:100%;box-shadow:var(--shadow);animation:up .18s ease;overflow:hidden}
+.gantt-popup-hdr{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+.gantt-popup-body{padding:16px 18px}
+
+@media(max-width:768px){
+  .gantt-eq-cell{min-width:150px;max-width:170px;padding:7px 10px !important}
+  .gantt-eq-name{font-size:11.5px}
+  .gantt-cell-wrap{height:40px}
+  .gantt-pill{width:26px;height:26px;font-size:12px;border-radius:7px}
 }
 
 </style>
@@ -857,7 +933,7 @@ button,select,input{touch-action:manipulation}
   <div id="schedule-list"></div>
 </div>
 
-<!-- ═══════════ CALENDAR VIEW PAGE ═══════════ -->
+<!-- ═══════════ CALENDAR VIEW PAGE (GANTT MINGGUAN) ═══════════ -->
 <div class="page" id="page-schedule-calendar">
   <div class="sec-hdr">
     <div>
@@ -893,14 +969,6 @@ button,select,input{touch-action:manipulation}
         <option value="overdue">⚠ Overdue</option>
         <option value="upcoming">◎ Belum / Upcoming</option>
       </select>
-      <select class="fsel" id="cal-filter-week" onchange="renderCalMonthView()">
-        <option value="">Semua Minggu</option>
-        <option value="1">Minggu 1</option>
-        <option value="2">Minggu 2</option>
-        <option value="3">Minggu 3</option>
-        <option value="4">Minggu 4</option>
-        <option value="5">Minggu 5</option>
-      </select>
       <button class="btn-ghost" onclick="clearCalFilters()">✕ Reset Filter</button>
     </div>
   </div>
@@ -908,8 +976,27 @@ button,select,input{touch-action:manipulation}
   <!-- Summary bar -->
   <div id="cal-summary-bar" style="display:none;margin-bottom:14px"></div>
 
-  <!-- Equipment list -->
+  <!-- Legend -->
+  <div class="gantt-legend" id="gantt-legend" style="display:none">
+    <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:rgba(74,158,63,.85)"></div>Sudah PM</div>
+    <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:rgba(192,57,43,.85)"></div>Overdue</div>
+    <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:rgba(230,126,34,.85)"></div>Belum / Upcoming</div>
+    <div class="gantt-legend-item"><div class="gantt-legend-dot" style="background:var(--border);width:8px;height:8px;border-radius:50%"></div>Tidak dijadwalkan minggu ini</div>
+  </div>
+
+  <!-- Gantt grid -->
   <div id="cal-month-list"></div>
+</div>
+
+<!-- POPUP DETAIL SEL GANTT -->
+<div class="gantt-popup-overlay" id="ganttPopupOverlay" onclick="if(event.target===this) closeGanttPopup()">
+  <div class="gantt-popup">
+    <div class="gantt-popup-hdr">
+      <span style="font-weight:700;font-size:13px;color:var(--navy)" id="gp-title">—</span>
+      <button class="modal-close" onclick="closeGanttPopup()">×</button>
+    </div>
+    <div class="gantt-popup-body" id="gp-body"></div>
+  </div>
 </div>
 
 <!-- ═══════════ INPUT LAPORAN PAGE ═══════════ -->
@@ -1328,12 +1415,34 @@ button,select,input{touch-action:manipulation}
       <div class="mnav-ico-wrap"><span class="mnav-ico">📅</span></div>
       <span>Schedule</span>
     </button>
-    <button class="mnav-btn" id="mnav-list" onclick="showPage('list')">
-      <div class="mnav-ico-wrap"><span class="mnav-ico">▤</span></div>
-      <span>Laporan</span>
+    <button class="mnav-btn" id="mnav-more" onclick="toggleMoreSheet()">
+      <div class="mnav-ico-wrap"><span class="mnav-ico">⋯</span></div>
+      <span>More</span>
     </button>
   </div>
 </nav>
+
+<!-- MOBILE "MORE" SHEET -->
+<div class="sidebar-backdrop" id="moreSheetBackdrop" onclick="closeMoreSheet()"></div>
+<div id="moreSheet" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:401;background:var(--bg2);border-top:2px solid var(--border);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(26,58,107,.15);padding:8px 0 max(8px,env(safe-area-inset-bottom))">
+  <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:6px auto 10px"></div>
+  <div style="padding:0 16px 6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Menu Lainnya</div>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('list')">
+    <span class="sb-icon">▤</span>Daftar Laporan
+  </button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('resume');renderResumePage()">
+    <span class="sb-icon">📊</span>Resume Laporan
+  </button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('schedule-calendar');renderCalendar()">
+    <span class="sb-icon">📆</span>Calendar View
+  </button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('takeover');renderTakeoverPage()">
+    <span class="sb-icon">🔄</span>Takeover PM
+  </button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('templates');loadTemplatePage()">
+    <span class="sb-icon">🛠</span>Kelola Template PM
+  </button>
+</div>
 
 <div id="toast-container"></div>
 
@@ -1740,9 +1849,12 @@ function showPage(page, fromHistory = false) {
   const el = document.getElementById('page-' + page);
   if (el) el.classList.add('active');
   document.querySelectorAll(`[data-page="${page}"]`).forEach(b => b.classList.add('active'));
-  const mnav = document.getElementById('mnav-' + page.split('-')[0]);
+  const morePages = ['list','resume','schedule-calendar','takeover','templates'];
+  const mnavId = morePages.includes(page) ? 'mnav-more' : 'mnav-' + page.split('-')[0];
+  const mnav = document.getElementById(mnavId);
   if (mnav) mnav.classList.add('active');
   closeSidebar();
+  closeMoreSheet();
 
   // Scroll ke atas saat pindah halaman
   const content = document.querySelector('.content');
@@ -1784,49 +1896,10 @@ window.addEventListener('popstate', function(e) {
   }
 });
 
-// ── Swipe kiri = back ──
-(function initSwipeBack() {
-  let touchStartX = 0;
-  let touchStartY = 0;
-  let touchStartTime = 0;
-
-  document.addEventListener('touchstart', function(e) {
-    touchStartX = e.touches[0].clientX;
-    touchStartY = e.touches[0].clientY;
-    touchStartTime = Date.now();
-  }, { passive: true });
-
-  document.addEventListener('touchend', function(e) {
-    // Jangan proses kalau ada overlay terbuka
-    if (document.querySelector('.overlay.open')) return;
-
-    const dx = e.changedTouches[0].clientX - touchStartX;
-    const dy = e.changedTouches[0].clientY - touchStartY;
-    const dt = Date.now() - touchStartTime;
-
-    // Swipe kanan-ke-kiri (dx negatif) dari tepi kiri layar
-    // Atau swipe kiri lebih panjang dari swipe vertikal
-    const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.5;
-    const isSwipeLeft  = dx < -60 && isHorizontal && dt < 400;
-    const isFromEdge   = touchStartX < 40; // swipe dari tepi kiri = buka sidebar
-
-    // Swipe kiri dari mana saja (bukan dari tepi kiri) = back
-    if (isSwipeLeft && !isFromEdge) {
-      if (_pageHistory.length > 0) {
-        const prev = _pageHistory.pop();
-        showPage(prev, true);
-        try { history.replaceState({ page: prev }, '', '#' + prev); } catch(e2) {}
-      }
-      return;
-    }
-
-    // Swipe kanan dari tepi kiri = buka sidebar (sudah ada, tapi kita tambahkan juga)
-    const isSwipeRight = dx > 60 && isHorizontal && dt < 400 && isFromEdge;
-    if (isSwipeRight) {
-      toggleSidebar();
-    }
-  }, { passive: true });
-})();
+// ── Swipe gesture DINONAKTIFKAN ──
+// Dimatikan karena mengganggu teknisi saat isi checklist PM
+// (swipe tidak sengaja saat scroll/tap form malah pindah halaman).
+// Navigasi sekarang HANYA lewat mobile nav, hamburger/sidebar, atau tombol back.
 function quickStatus(s) { showPage('schedule'); document.getElementById('sch-filter-status').value=s; renderScheduleList(); }
 function toggleSidebar() {
   const sb = document.getElementById('sidebar');
@@ -1840,6 +1913,22 @@ function closeSidebar() {
 }
 function openOverlay(id) { document.getElementById(id)?.classList.add('open'); }
 function closeOverlay(id) { document.getElementById(id)?.classList.remove('open'); }
+
+function toggleMoreSheet() {
+  const sheet = document.getElementById('moreSheet');
+  const bd    = document.getElementById('moreSheetBackdrop');
+  if (!sheet) return;
+  const isOpen = sheet.style.display === 'block';
+  if (isOpen) { closeMoreSheet(); return; }
+  sheet.style.display = 'block';
+  bd?.classList.add('open');
+}
+function closeMoreSheet() {
+  const sheet = document.getElementById('moreSheet');
+  const bd    = document.getElementById('moreSheetBackdrop');
+  if (sheet) sheet.style.display = 'none';
+  bd?.classList.remove('open');
+}
 
 // ════════════════════════════════════════════════════════
 //  UNIT FILTER POPULATE
@@ -2546,7 +2635,7 @@ function onCalUnitChange() {
 }
 
 function clearCalFilters() {
-  ['cal-filter-unit','cal-filter-area','cal-filter-status','cal-filter-week'].forEach(id => {
+  ['cal-filter-unit','cal-filter-area','cal-filter-status'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value = '';
   });
   renderCalMonthView();
@@ -2560,6 +2649,7 @@ function renderCalMonthView() {
   const now      = new Date(); now.setHours(0,0,0,0);
   const curMonth = now.getMonth() + 1;
   const curYear  = now.getFullYear();
+  const curWeek  = getWeekOfMonth(now);
 
   const allSchedules = getData(STORE.SCHEDULES);
   const reports      = getData(STORE.REPORTS);
@@ -2567,13 +2657,12 @@ function renderCalMonthView() {
   const unitF   = document.getElementById('cal-filter-unit')?.value   || '';
   const areaF   = document.getElementById('cal-filter-area')?.value   || '';
   const statusF = document.getElementById('cal-filter-status')?.value || '';
-  const weekF   = document.getElementById('cal-filter-week')?.value   || '';
 
   // Update subtitle
   const sub = document.getElementById('cal-view-sub');
-  if (sub) sub.textContent = `${MONTHS_ID[month-1]} ${year}`;
+  if (sub) sub.textContent = `${MONTHS_ID[month-1]} ${year} — Gantt Mingguan`;
 
-  // Filter schedules yang masuk bulan ini
+  // Equipment yang masuk bulan ini (independen dari minggu mana jadwalnya)
   let scheduled = allSchedules.filter(s => {
     const sMonth = parseInt(s.month) || 0;
     if (!sMonth) return false;
@@ -2588,11 +2677,10 @@ function renderCalMonthView() {
     if (!inMonth) return false;
     if (unitF && s.unit !== unitF) return false;
     if (areaF && s.area !== areaF) return false;
-    if (weekF && String(s.week||'') !== weekF) return false;
     return true;
   });
 
-  // Tentukan status tiap schedule untuk bulan ini
+  // Tentukan status equipment utk bulan ini (dipakai utk filter status & summary)
   const withStatus = scheduled.map(s => {
     const hasReport = _checkHasReport(s, month, year, reports);
     const latestReport = _getLatestReport(s, month, year, reports);
@@ -2609,12 +2697,9 @@ function renderCalMonthView() {
     return { ...s, _status: status, _report: latestReport };
   });
 
-  // Filter status
-  const filtered = statusF
-    ? withStatus.filter(s => s._status === statusF)
-    : withStatus;
+  const filtered = statusF ? withStatus.filter(s => s._status === statusF) : withStatus;
 
-  // Summary
+  // ── Summary bar ──
   const total    = filtered.length;
   const done     = filtered.filter(s => s._status === 'done').length;
   const overdue  = filtered.filter(s => s._status === 'overdue').length;
@@ -2656,96 +2741,113 @@ function renderCalMonthView() {
       </div>`;
   }
 
+  const legend = document.getElementById('gantt-legend');
   const container = document.getElementById('cal-month-list');
   if (!container) return;
 
   if (!filtered.length) {
+    if (legend) legend.style.display = 'none';
     container.innerHTML = `<div class="empty"><div class="empty-ico">📅</div>
       <div class="empty-msg">Tidak ada schedule PM untuk ${MONTHS_ID[month-1]} ${year}${statusF?' dengan filter ini':''}.</div></div>`;
     return;
   }
+  if (legend) legend.style.display = 'flex';
 
-  // Sort: overdue → upcoming → future → done
-  const sortOrder = { overdue:0, upcoming:1, future:2, done:3 };
-  filtered.sort((a,b) => {
-    const od = sortOrder[a._status] ?? 4;
-    const ob = sortOrder[b._status] ?? 4;
-    if (od !== ob) return od - ob;
-    return (a.unit||'').localeCompare(b.unit||'') || (a.area||'').localeCompare(b.area||'');
-  });
-
-  // Group by unit
+  // ── Group: Unit → Area → equipment list (urutan sesuai Schedule List) ──
   const groups = {};
   filtered.forEach(s => {
     const unit = s.unit || '(Tanpa Unit)';
-    if (!groups[unit]) groups[unit] = [];
-    groups[unit].push(s);
+    const area = s.area || '(Tanpa Area)';
+    if (!groups[unit]) groups[unit] = {};
+    if (!groups[unit][area]) groups[unit][area] = [];
+    groups[unit][area].push(s);
   });
 
+  // Simpan referensi data utk popup (key = schedule id)
+  window._ganttData = {};
+  filtered.forEach(s => { window._ganttData[s.id] = s; });
+
+  const weeks = [1,2,3,4,5];
+  const isCurMonthYear = (month === curMonth && year === curYear);
+
+  let html = `<div class="gantt-wrap"><div class="gantt-scroll"><table class="gantt-table">
+    <thead><tr>
+      <th class="gantt-eq-hdr">Equipment</th>
+      ${weeks.map(w => `<th ${isCurMonthYear && w===curWeek ? 'style="background:var(--green2)"' : ''}>Minggu ${w}${isCurMonthYear && w===curWeek ? ' •' : ''}</th>`).join('')}
+    </tr></thead>
+    <tbody>`;
+
+  Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).forEach(([unit, areas]) => {
+    const unitItems = Object.values(areas).flat();
+    html += `<tr class="gantt-group-row"><td colspan="${weeks.length+1}">🏭 ${unit} <span style="font-weight:400;color:var(--text3);font-size:10px">(${unitItems.length} equipment)</span></td></tr>`;
+
+    Object.entries(areas).sort(([a],[b])=>a.localeCompare(b)).forEach(([area, items]) => {
+      html += `<tr class="gantt-group-row"><td colspan="${weeks.length+1}" style="padding-left:26px !important;color:var(--text2);font-size:11px">📍 ${area}</td></tr>`;
+
+      items.forEach(s => {
+        const sWeek = parseInt(s.week) || 1;
+        html += `<tr>
+          <td class="gantt-eq-cell">
+            <div class="gantt-eq-name">${s.equipment}</div>
+            <div class="gantt-eq-sub">${s.periode}${s.tagNo?' · '+s.tagNo:''}</div>
+          </td>
+          ${weeks.map(w => {
+            if (w !== sWeek) {
+              return `<td class="gantt-week-cell"><span class="gantt-dot-empty"></span></td>`;
+            }
+            const icon = s._status === 'done' ? '✓' : s._status === 'overdue' ? '!' : '◎';
+            return `<td class="gantt-week-cell"><span class="gantt-pill ${s._status}" onclick="openGanttPopup('${s.id}')">${icon}</span></td>`;
+          }).join('')}
+        </tr>`;
+      });
+    });
+  });
+
+  html += `</tbody></table></div></div>`;
+  container.innerHTML = html;
+}
+
+// ── Popup detail sel Gantt ──
+function openGanttPopup(scheduleId) {
+  const s = (window._ganttData || {})[scheduleId];
+  if (!s) return;
+
   const statusLabel = {
-    done:     { text:'✓ Sudah PM',   cls:'b-done',     icon:'✅', iconCls:'done' },
-    overdue:  { text:'⚠ Overdue',    cls:'b-overdue',  icon:'⚠️', iconCls:'overdue' },
-    upcoming: { text:'◎ Belum',      cls:'b-upcoming', icon:'🔧', iconCls:'upcoming' },
-    future:   { text:'— Terjadwal',  cls:'b-yearly',   icon:'📅', iconCls:'future' },
-  };
+    done:     { text:'✓ Sudah PM',  color:'var(--green2)' },
+    overdue:  { text:'⚠ Overdue',   color:'var(--red)' },
+    upcoming: { text:'◎ Belum PM',  color:'var(--orange)' },
+    future:   { text:'— Terjadwal', color:'var(--text3)' },
+  }[s._status] || { text:'—', color:'var(--text3)' };
 
-  container.innerHTML = Object.entries(groups).map(([unit, items]) => {
-    const unitDone    = items.filter(s=>s._status==='done').length;
-    const unitOverdue = items.filter(s=>s._status==='overdue').length;
+  const reportDate = s._report?.date
+    ? new Date(s._report.date).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'})
+    : null;
 
-    const cards = items.map(s => {
-      const sl = statusLabel[s._status] || statusLabel.future;
-      const reportDate = s._report?.date
-        ? new Date(s._report.date).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})
-        : null;
-      const nextDue  = getNextDue(s);
-      const diffDays = Math.floor((nextDue - new Date().setHours(0,0,0,0)) / 86400000);
-
-      const metaParts = [
-        s.area ? `📍 ${s.area}` : null,
-        `🔄 ${s.periode}`,
-        `Minggu ${s.week||'?'}`,
-        s.pic ? `👤 ${s.pic}` : null,
-        s.tagNo ? s.tagNo : null,
-      ].filter(Boolean).join('  ·  ');
-
-      const extraInfo = s._status === 'done' && reportDate
-        ? `<div style="font-size:11px;color:var(--green2);margin-top:4px">✓ PM dilakukan: ${reportDate}</div>`
-        : s._status === 'overdue'
-        ? `<div style="font-size:11px;color:var(--red);margin-top:4px">⚠ Telat ${Math.abs(diffDays)} hari</div>`
-        : s._status === 'upcoming'
-        ? `<div style="font-size:11px;color:var(--orange);margin-top:4px">◎ ${diffDays >= 0 ? diffDays+' hari lagi' : 'Segera'}</div>`
-        : '';
-
-      const actionBtn = s._status !== 'done'
-        ? `<button class="btn-primary" style="font-size:11px;padding:6px 12px;white-space:nowrap" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>`
+  document.getElementById('gp-title').textContent = s.equipment;
+  document.getElementById('gp-body').innerHTML = `
+    <div style="margin-bottom:12px">
+      <span class="badge" style="background:transparent;border:1px solid ${statusLabel.color};color:${statusLabel.color};font-size:11px;padding:3px 10px">${statusLabel.text}</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--text2)">
+      <div>🏭 <strong>${s.unit||'—'}</strong> &nbsp;·&nbsp; 📍 ${s.area||'—'}</div>
+      <div>🔄 Periode: <strong>${s.periode}</strong> &nbsp;·&nbsp; Minggu ${s.week||'?'}</div>
+      ${s.tagNo ? `<div>🏷 Tag: <strong>${s.tagNo}</strong></div>` : ''}
+      ${s.pic ? `<div>👤 PIC: <strong>${s.pic}</strong></div>` : ''}
+      ${reportDate ? `<div style="color:var(--green2)">✓ PM dilakukan: ${reportDate}</div>` : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      ${s._status !== 'done'
+        ? `<button class="btn-primary" style="flex:1;font-size:12px;padding:9px 14px" onclick="closeGanttPopup();eksekusiPM('${s.id}')">▶ Eksekusi PM</button>`
         : s._report
-        ? `<button class="tbl-btn pdf" style="font-size:11px" onclick="downloadPMPDFById('${s._report.id}')">📄 PDF</button>`
-        : '';
+        ? `<button class="btn-blue" style="flex:1;font-size:12px;padding:9px 14px" onclick="closeGanttPopup();downloadPMPDFById('${s._report.id}')">📄 Lihat PDF</button>`
+        : ''}
+      <button class="btn-ghost" style="font-size:12px;padding:9px 14px" onclick="closeGanttPopup()">Tutup</button>
+    </div>`;
 
-      return `<div class="cal-eq-card status-${s._status}">
-        <div class="cal-eq-icon ${sl.iconCls}">${sl.icon}</div>
-        <div class="cal-eq-info">
-          <div class="cal-eq-name">${s.equipment}</div>
-          <div class="cal-eq-meta">${metaParts}</div>
-          ${extraInfo}
-        </div>
-        <div class="cal-eq-status">
-          <span class="badge ${sl.cls}" style="display:block;text-align:center;margin-bottom:6px">${sl.text}</span>
-          ${actionBtn}
-        </div>
-      </div>`;
-    }).join('');
-
-    return `<div class="cal-group-hdr">
-        <span style="font-size:15px">🏭</span>
-        <span style="flex:1">${unit}</span>
-        <span class="badge b-done" style="font-size:9px">✓ ${unitDone}</span>
-        ${unitOverdue ? `<span class="badge b-overdue" style="font-size:9px">⚠ ${unitOverdue}</span>` : ''}
-        <span style="font-size:11px;color:var(--text3)">${items.length} item</span>
-      </div>
-      ${cards}`;
-  }).join('');
+  document.getElementById('ganttPopupOverlay').classList.add('open');
+}
+function closeGanttPopup() {
+  document.getElementById('ganttPopupOverlay')?.classList.remove('open');
 }
 
 // Helper: cek apakah ada laporan untuk schedule ini di bulan & tahun tertentu
@@ -4996,6 +5098,22 @@ function updateSidebarBadges() {
   const tkoBadge = document.getElementById('sb-takeover-badge');
   if (tkoBadge) { tkoBadge.textContent = pastMonth.length; tkoBadge.style.display = pastMonth.length ? 'inline-block' : 'none'; }
 }
+
+// ── Full lock zoom (cegah pinch & double-tap zoom di semua browser) ──
+(function lockZoom() {
+  document.addEventListener('touchmove', function(e) {
+    if (e.scale !== undefined && e.scale !== 1) e.preventDefault();
+  }, { passive: false });
+
+  let lastTouchEnd = 0;
+  document.addEventListener('touchend', function(e) {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+
+  document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+})();
 
 window.addEventListener('load', () => {
   applyLocalTemplates(); // Load custom templates on start
