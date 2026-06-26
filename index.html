@@ -849,6 +849,7 @@ button,select,input{touch-action:manipulation}
       <button class="btn-ghost" onclick="schExpandAll()">⊞ Expand All</button>
       <button class="btn-ghost" onclick="schCollapseAll()">⊟ Collapse All</button>
       <button class="btn-ghost" onclick="showPage('schedule-calendar')">📆 Calendar</button>
+      <button class="btn-blue" onclick="downloadSchedulePDF()">📥 Download PDF</button>
       <button class="btn-primary" onclick="openScheduleModal()">+ TAMBAH</button>
     </div>
   </div>
@@ -3988,6 +3989,21 @@ function onSchUnitChange() {
   renderScheduleList();
 }
 
+function _hasReportThisYear(s) {
+  const curYear = new Date().getFullYear();
+  const reports = getData(STORE.REPORTS);
+  const sTag    = (s.tagNo||'').trim().toLowerCase();
+  const sName   = (s.equipment||'').trim().toLowerCase();
+  const sUnit   = (s.unit||'').trim().toLowerCase();
+  return reports.some(r => {
+    if (!r.date) return false;
+    if (new Date(r.date).getFullYear() !== curYear) return false;
+    if (sTag  && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
+    return (r.equipmentName||'').trim().toLowerCase() === sName
+        && (r.unit||'').trim().toLowerCase() === sUnit;
+  });
+}
+
 function renderScheduleList() {
   const schedules = getData(STORE.SCHEDULES);
   const search   = (document.getElementById('sch-search')?.value||'').toLowerCase();
@@ -4001,7 +4017,17 @@ function renderScheduleList() {
     if (unitF    && s.unit    !== unitF)    return false;
     if (areaF    && s.area    !== areaF)    return false;
     if (periodeF && s.periode !== periodeF) return false;
-    if (statusF  && getScheduleStatus(s)  !== statusF)  return false;
+    // Kalau filter status 'done' dipilih eksplisit, tampilkan yang done
+    // Kalau tidak ada filter status → sembunyikan yang sudah selesai tahun ini
+    if (statusF === 'done') {
+      if (!_hasReportThisYear(s)) return false;
+    } else if (statusF) {
+      if (getScheduleStatus(s) !== statusF) return false;
+      if (_hasReportThisYear(s)) return false;
+    } else {
+      // Default: sembunyikan yang sudah ada laporan tahun ini
+      if (_hasReportThisYear(s)) return false;
+    }
     return true;
   });
 
@@ -5702,6 +5728,299 @@ renderInputPMPage();
 populateUnitFilters();
 updateSidebarBadges();
 });
+// ════════════════════════════════════════════════════════
+//  SCHEDULE PDF — Plan vs Actual Annual View
+// ════════════════════════════════════════════════════════
+function downloadSchedulePDF() {
+  const schedules = getData(STORE.SCHEDULES);
+  const reports   = getData(STORE.REPORTS);
+
+  if (!schedules.length) { toast('Belum ada schedule PM', 'warning'); return; }
+
+  // Ambil semua filter yang aktif
+  const unitF    = document.getElementById('sch-filter-unit')?.value    || '';
+  const areaF    = document.getElementById('sch-filter-area')?.value    || '';
+  const periodeF = document.getElementById('sch-filter-periode')?.value || '';
+  const statusF  = document.getElementById('sch-filter-status')?.value  || '';
+  const searchQ  = (document.getElementById('sch-search')?.value        || '').toLowerCase();
+
+  const filtered = schedules.filter(s => {
+    if (unitF    && s.unit    !== unitF)    return false;
+    if (areaF    && s.area    !== areaF)    return false;
+    if (periodeF && s.periode !== periodeF) return false;
+    if (statusF  && getScheduleStatus(s)   !== statusF) return false;
+    if (searchQ  && ![(s.equipment||''),(s.unit||''),(s.area||''),(s.tagNo||'')].some(v=>v.toLowerCase().includes(searchQ))) return false;
+    return true;
+  });
+  if (!filtered.length) { toast('Tidak ada schedule untuk filter ini', 'warning'); return; }
+
+  // Group by unit
+  const unitGroups = {};
+  filtered.forEach(s => {
+    const u = s.unit || '(Tanpa Unit)';
+    if (!unitGroups[u]) unitGroups[u] = [];
+    unitGroups[u].push(s);
+  });
+
+  const curYear  = new Date().getFullYear();
+  const printDate = new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
+
+  const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Fungsi cek: apakah ada laporan untuk schedule s di bulan m, minggu w
+  function hasActual(s, m, w) {
+    const sTag  = (s.tagNo||'').trim().toLowerCase();
+    const sName = (s.equipment||'').trim().toLowerCase();
+    const sUnit = (s.unit||'').trim().toLowerCase();
+    return reports.some(r => {
+      if (!r.date) return false;
+      const rd = new Date(r.date);
+      if (rd.getMonth() + 1 !== m) return false;
+      // Cek week: pakai field week dari report, atau hitung dari tanggal
+      const rWeek = parseInt(r.week) || getWeekOfMonth(rd);
+      if (rWeek !== w) return false;
+      if (sTag  && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
+      return (r.equipmentName||'').trim().toLowerCase() === sName
+          && (r.unit||'').trim().toLowerCase() === sUnit;
+    });
+  }
+
+  // Fungsi cek: apakah minggu ini adalah plan untuk schedule s
+  function hasPlan(s, m, w) {
+    const sMonth = parseInt(s.month) || 0;
+    const sWeek  = parseInt(s.week)  || 1;
+    if (!sMonth) return false;
+
+    if (s.periode === 'Monthly')     return sMonth === m && sWeek === w;
+    if (s.periode === 'Weekly')      return sWeek === w; // setiap bulan minggu ini
+    if (s.periode === 'Daily')       return true;
+    if (s.periode === 'Quarterly')   return ((m - sMonth) % 3 === 0) && m >= sMonth && sWeek === w;
+    if (s.periode === 'Semi-Annual') return ((m - sMonth) % 6 === 0) && m >= sMonth && sWeek === w;
+    if (s.periode === 'Annual')      return sMonth === m && sWeek === w;
+    return sMonth === m && sWeek === w;
+  }
+
+  // Hitung header kolom: tiap bulan punya max minggu
+  // Kolom: per bulan 1-12, tiap bulan W1-W5 (tapi hanya tampilkan W yang ada plan/actual)
+  // Agar sama persis gambar: tampilkan W1-W4 (atau W5 kalau ada)
+  const WEEKS_PER_MONTH = [4,4,4,4,5,4,4,4,5,4,4,5]; // perkiraan 2025/2026
+
+  // Hitung actual weeks per month dari data schedules
+  const weeksPerMonth = Array(12).fill(4);
+  filtered.forEach(s => {
+    const sMonth = parseInt(s.month);
+    const sWeek  = parseInt(s.week);
+    if (sMonth >= 1 && sMonth <= 12 && sWeek > weeksPerMonth[sMonth-1]) {
+      weeksPerMonth[sMonth-1] = sWeek;
+    }
+  });
+
+  // Hitung actual dari laporan juga
+  reports.forEach(r => {
+    if (!r.date) return;
+    const rd = new Date(r.date);
+    const m  = rd.getMonth();
+    const w  = parseInt(r.week) || getWeekOfMonth(rd);
+    if (w > weeksPerMonth[m]) weeksPerMonth[m] = w;
+  });
+
+  // Pastikan min W4
+  weeksPerMonth.forEach((w,i) => { if (w < 4) weeksPerMonth[i] = 4; });
+
+  // Build header HTML
+  let monthHeaderRow = '<tr>';
+  monthHeaderRow += '<th rowspan="2" style="min-width:26px;text-align:center;background:#1a3a6b;color:#fff;border:1px solid #2a4a7b;font-size:7pt;padding:4px 2px">Item</th>';
+  monthHeaderRow += '<th rowspan="2" style="min-width:140px;text-align:left;background:#1a3a6b;color:#fff;border:1px solid #2a4a7b;font-size:7pt;padding:4px 6px">Machine / Operation Utilities</th>';
+  monthHeaderRow += '<th rowspan="2" style="min-width:48px;text-align:center;background:#1a3a6b;color:#fff;border:1px solid #2a4a7b;font-size:7pt;padding:4px 2px">Activity</th>';
+  for (let m = 0; m < 12; m++) {
+    monthHeaderRow += `<th colspan="${weeksPerMonth[m]}" style="text-align:center;background:#1a3a6b;color:#fff;border:1px solid #2a4a7b;font-size:7pt;padding:3px 2px">${MONTH_SHORT[m]}</th>`;
+  }
+  monthHeaderRow += '</tr>';
+
+  // Week sub-header
+  let weekHeaderRow = '<tr>';
+  for (let m = 0; m < 12; m++) {
+    for (let w = 1; w <= weeksPerMonth[m]; w++) {
+      weekHeaderRow += `<th style="text-align:center;background:#1e4a80;color:rgba(255,255,255,.8);border:1px solid #2a4a7b;font-size:6.5pt;padding:2px 1px;min-width:18px">${w}</th>`;
+    }
+  }
+  weekHeaderRow += '</tr>';
+
+  // Build count row per unit (total plan per month)
+  function buildCountRow(items) {
+    let row = '<tr style="background:#f0f4f0">';
+    row += '<td style="text-align:center;border:1px solid #ccc;font-size:7pt;color:#888"></td>';
+    row += '<td style="padding:3px 6px;border:1px solid #ccc;font-size:7pt;font-weight:700;color:#1a3a6b"></td>';
+    row += '<td style="text-align:center;border:1px solid #ccc;font-size:7pt"></td>';
+    let totalCols = 0;
+    for (let m = 0; m < 12; m++) {
+      for (let w = 1; w <= weeksPerMonth[m]; w++) {
+        const planCnt = items.filter(s => hasPlan(s, m+1, w)).length;
+        const actCnt  = items.filter(s => hasActual(s, m+1, w)).length;
+        const display = planCnt > 0 ? planCnt : (actCnt > 0 ? actCnt : '');
+        row += `<td style="text-align:center;border:1px solid #ccc;font-size:6.5pt;font-weight:700;color:#1a3a6b">${display}</td>`;
+        totalCols++;
+      }
+    }
+    row += '</tr>';
+    return row;
+  }
+
+  // Build all unit tables
+  let allTablesHTML = '';
+
+  Object.entries(unitGroups).forEach(([unitName, items]) => {
+    // Sort by area then equipment name
+    items.sort((a,b) => {
+      const areaA = a.area||''; const areaB = b.area||'';
+      if (areaA !== areaB) return areaA.localeCompare(areaB);
+      return (a.equipment||'').localeCompare(b.equipment||'');
+    });
+
+    // Data rows
+    let dataRows = '';
+    items.forEach((s, idx) => {
+      const rowBg = idx % 2 === 0 ? '#fff' : '#f7faf7';
+      let row = `<tr style="background:${rowBg}">`;
+      row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;color:#555">${idx+1}</td>`;
+      row += `<td style="padding:3px 6px;border:1px solid #ddd;font-size:7.5pt">${s.equipment||'—'}</td>`;
+      row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;font-weight:700">A</td>`;
+
+      for (let m = 0; m < 12; m++) {
+        for (let w = 1; w <= weeksPerMonth[m]; w++) {
+          const isPlan   = hasPlan(s, m+1, w);
+          const isActual = hasActual(s, m+1, w);
+
+          let cellContent = '';
+          let cellStyle   = 'text-align:center;border:1px solid #ddd;font-size:7pt;font-weight:700;';
+
+          if (isPlan && isActual) {
+            cellContent = 'P+A';
+            cellStyle  += 'background:#2e7d32;color:#fff;';
+          } else if (isPlan) {
+            cellContent = 'P';
+            cellStyle  += 'background:#f9c800;color:#000;';
+          } else if (isActual) {
+            cellContent = 'A';
+            cellStyle  += 'background:#4a9e3f;color:#fff;';
+          } else {
+            cellStyle  += 'background:#fff;color:#ddd;';
+          }
+
+          row += `<td style="${cellStyle}">${cellContent}</td>`;
+        }
+      }
+      row += '</tr>';
+      dataRows += row;
+    });
+
+    // Count row
+    const countRow = buildCountRow(items);
+
+    // Summary for signature
+    allTablesHTML += `
+      <div style="margin-bottom:24px;page-break-inside:avoid">
+        <div style="background:#1a3a6b;color:#fff;padding:6px 10px;font-size:9pt;font-weight:700;border-radius:3px 3px 0 0;display:flex;align-items:center;justify-content:space-between">
+          <span>🏭 ${unitName}</span>
+          <span style="font-size:8pt;font-weight:400;color:rgba(255,255,255,.7)">${items.length} equipment</span>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="border-collapse:collapse;width:100%;min-width:900px">
+            ${monthHeaderRow}
+            ${weekHeaderRow}
+            ${dataRows}
+            ${countRow}
+          </table>
+        </div>
+      </div>`;
+  });
+
+  // Legend
+  const legendHTML = `
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:6px 10px;background:#f4f7f4;border:1px solid #ccc;border-radius:4px;font-size:7.5pt">
+      <strong>Keterangan:</strong>
+      <span><span style="display:inline-block;width:18px;height:14px;background:#f9c800;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>P = Plan (Terjadwal)</span>
+      <span><span style="display:inline-block;width:18px;height:14px;background:#4a9e3f;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>A = Actual (Laporan Masuk)</span>
+      <span><span style="display:inline-block;width:18px;height:14px;background:#2e7d32;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>P+A = Plan & Actual (sama minggu)</span>
+    </div>`;
+
+  // Signature block
+  const sigHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:20px;border:1px solid #ccc">
+      <div style="padding:10px 14px;text-align:center;border-right:1px solid #ccc">
+        <div style="font-size:8pt;font-weight:700;margin-bottom:4px">Diajukan</div>
+        <div style="height:60px;border-bottom:1px solid #bbb;margin:0 12px"></div>
+        <div style="font-size:8pt;font-weight:600;margin-top:6px">SPV Maintenance</div>
+      </div>
+      <div style="padding:10px 14px;text-align:center;border-right:1px solid #ccc">
+        <div style="font-size:8pt;font-weight:700;margin-bottom:4px">Disetujui</div>
+        <div style="height:60px;border-bottom:1px solid #bbb;margin:0 12px"></div>
+        <div style="font-size:8pt;font-weight:600;margin-top:6px">Plan Manager</div>
+      </div>
+      <div style="padding:10px 14px;text-align:center">
+        <div style="font-size:8pt;font-weight:700;margin-bottom:4px">Mengetahui</div>
+        <div style="height:60px;border-bottom:1px solid #bbb;margin:0 12px"></div>
+        <div style="font-size:8pt;font-weight:600;margin-top:6px">Mgr Maintenance</div>
+      </div>
+    </div>`;
+
+  // Build label filter aktif untuk judul PDF
+  const filterParts = [];
+  if (unitF)    filterParts.push(unitF);
+  if (areaF)    filterParts.push(areaF);
+  if (periodeF) filterParts.push(periodeF);
+  if (statusF)  filterParts.push(statusF === 'done' ? 'On Track' : statusF === 'overdue' ? 'Overdue' : 'Upcoming');
+  if (searchQ)  filterParts.push(`"${searchQ}"`);
+  const unitLabel = filterParts.length ? filterParts.join(' · ') : 'All Equipment';
+
+  const fullHTML = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+<title>PM Plan ${curYear} — ${unitLabel}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+@page{size:A3 landscape;margin:8mm 10mm}
+body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#111;background:#fff}
+table{border-collapse:collapse}
+@media print{
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .no-print{display:none}
+}
+</style></head><body>
+
+<!-- Print button -->
+<div class="no-print" style="padding:10px;background:#f4f7f4;border-bottom:2px solid #1a3a6b;display:flex;align-items:center;gap:12px">
+  <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">🖨 PRINT / SAVE AS PDF</button>
+  <span style="font-size:11px;color:#666">💡 Pilih Save as PDF di dialog print · Gunakan ukuran kertas A3 Landscape</span>
+  <button onclick="window.close()" style="margin-left:auto;background:none;border:1px solid #ccc;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px">✕ Tutup</button>
+</div>
+
+<!-- Header -->
+<div style="display:flex;align-items:center;gap:14px;padding:10px 0 8px;border-bottom:2px solid #1a3a6b;margin-bottom:10px">
+  <div style="flex-shrink:0"><img src="${document.querySelector('.brand img')?.src || ''}" style="height:40px;width:auto;object-fit:contain"></div>
+  <div style="flex:1">
+    <div style="font-size:13pt;font-weight:900;color:#1a3a6b">Preventive Maintenance Plan ${curYear}</div>
+    <div style="font-size:9pt;font-weight:600;color:#3a5a3a;margin-top:1px">Annual Preventive Maintenance plan for: ${unitLabel}</div>
+  </div>
+  <div style="text-align:right;font-size:7.5pt;color:#888">
+    <div>Dicetak: ${printDate}</div>
+    <div style="margin-top:2px">Form: F-MTC-PLN-01 | Rev: 00</div>
+  </div>
+</div>
+
+${legendHTML}
+${allTablesHTML}
+${sigHTML}
+
+<div style="margin-top:10px;padding:4px 0;font-size:7pt;color:#aaa;border-top:1px solid #eee;text-align:center">
+  PM Plan ${curYear} — PT Prasad Seeds Indonesia | Dicetak: ${printDate} | Total Equipment: ${filtered.length}
+</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(fullHTML);
+  w.document.close();
+  setTimeout(() => { w.focus(); }, 300);
+}
+
 // ════════════════════════════════════════════════════════
 //  WORK ORDER — dari laporan PM (semua anomali → 1 WO)
 // ════════════════════════════════════════════════════════
