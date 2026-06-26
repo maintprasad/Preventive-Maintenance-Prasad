@@ -1572,7 +1572,7 @@ button,select,input{touch-action:manipulation}
         <div class="form-grid" style="margin-bottom:10px">
           <div class="fg">
             <span class="flabel">Nama Leader</span>
-            <input class="finput" type="text" id="sig-spv-name" placeholder="Nama lengkap Supervisor">
+            <input class="finput" type="text" id="sig-spv-name" placeholder="Nama lengkap Leader">
           </div>
           <div class="fg" style="justify-content:flex-end;padding-top:18px">
             <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('spv')">🗑 Hapus TTD</button>
@@ -1621,6 +1621,69 @@ const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbw7mZX2OplLpKPS-prU2
 const WO_URL = 'https://script.google.com/macros/s/AKfycbxWC3esNUKacXKDx1cGqzrtaaH0vKW4pbsVV6_zmUj5jSXBTP2aZLJ73X6M9vW9W3ro/exec';
 
 // ════════════════════════════════════════════════════════
+//  OFFLINE SYNC QUEUE
+// ════════════════════════════════════════════════════════
+const STORE_QUEUE = 'pm_sync_queue_v1';
+
+function enqueueSync(action, payload) {
+  try {
+    const q = JSON.parse(localStorage.getItem(STORE_QUEUE) || '[]');
+    q.push({ action, payload, queuedAt: new Date().toISOString(), retries: 0 });
+    localStorage.setItem(STORE_QUEUE, JSON.stringify(q));
+  } catch(e) { console.warn('[Queue] enqueue error:', e); }
+}
+
+function _getQueueCount() {
+  try { return JSON.parse(localStorage.getItem(STORE_QUEUE) || '[]').length; } catch { return 0; }
+}
+
+async function flushSyncQueue() {
+  try {
+    const q = JSON.parse(localStorage.getItem(STORE_QUEUE) || '[]');
+    if (!q.length) return;
+
+    const failed = [];
+    let successCount = 0;
+
+    for (const item of q) {
+      try {
+        const res = await api(item.action, item.payload, 1);
+        if (res?.success) {
+          successCount++;
+        } else {
+          // Masih gagal — simpan kembali jika belum melebihi batas retry
+          if (item.retries < 3) {
+            failed.push({ ...item, retries: item.retries + 1 });
+          }
+          // retries >= 3: buang, sudah terlalu lama
+        }
+      } catch(e) {
+        if (item.retries < 3) {
+          failed.push({ ...item, retries: item.retries + 1 });
+        }
+      }
+    }
+
+    localStorage.setItem(STORE_QUEUE, JSON.stringify(failed));
+
+    if (successCount > 0) {
+      toast(`☁ ${successCount} data pending berhasil tersync`, 'success');
+    }
+    if (failed.length > 0) {
+      toast(`⚠ ${failed.length} data masih gagal sync`, 'warning');
+    }
+
+    // Update badge queue di topbar
+    setSyncStatus(
+      failed.length > 0 ? 'error' : 'online',
+      failed.length > 0 ? `${failed.length} item gagal sync` : 'Tersinkron ✓'
+    );
+  } catch(e) {
+    console.warn('[Queue] flush error:', e);
+  }
+}
+
+// ════════════════════════════════════════════════════════
 //  STORE
 // ════════════════════════════════════════════════════════
 const STORE = { REPORTS:'pm_reports_v3', SCHEDULES:'pm_schedules_v3', LAST_SYNC:'pm_last_sync_v3' };
@@ -1628,21 +1691,65 @@ const _mem = {};
 function _lsOK(){ try{localStorage.setItem('__t__','1');localStorage.removeItem('__t__');return true;}catch(e){return false;} }
 const _useLS = _lsOK();
 
+// ── Memoization cache: di-reset setiap kali data berubah ──
+let _statusCache = null;       // Map: scheduleId → status string
+let _reportIndexCache = null;  // Set: key untuk hasReport lookup
+
+function _invalidateCache() {
+  _statusCache      = null;
+  _reportIndexCache = null;
+  // rebuild index langsung supaya halaman aktif bisa langsung pakai
+}
+
+function _buildReportIndex() {
+  if (_reportIndexCache) return _reportIndexCache;
+  const reports = getData(STORE.REPORTS);
+  _reportIndexCache = new Set();
+  reports.forEach(r => {
+    if (!r.date) return;
+    const tag  = (r.tagNo||'').trim().toLowerCase();
+    const name = (r.equipmentName||'').trim().toLowerCase();
+    const unit = (r.unit||'').trim().toLowerCase();
+    const y    = new Date(r.date).getFullYear();
+    const m    = new Date(r.date).getMonth() + 1;
+    if (tag)  _reportIndexCache.add(`tag:${tag}:${y}:${m}`);
+    if (name) _reportIndexCache.add(`eq:${name}|${unit}:${y}:${m}`);
+    // tanpa bulan/tahun — untuk getScheduleStatus (any report)
+    if (tag)  _reportIndexCache.add(`tag:${tag}`);
+    if (name) _reportIndexCache.add(`eq:${name}|${unit}`);
+  });
+  return _reportIndexCache;
+}
+
 function _safeParseJSON(val, fallback) {
   if (val === null || val === undefined) return fallback;
-  if (typeof val !== 'string') return val; // already parsed
+  if (typeof val !== 'string') return val;
   try { return JSON.parse(val); } catch(e) { return fallback; }
 }
 
 function _sanitizeReport(item) {
   if (!item) return item;
-  item.ppe = _safeParseJSON(item.ppe, {});
+  item.ppe        = _safeParseJSON(item.ppe, {});
   if (typeof item.ppe !== 'object' || Array.isArray(item.ppe)) item.ppe = {};
-  item.aktivitas = _safeParseJSON(item.aktivitas, []);
+  item.aktivitas  = _safeParseJSON(item.aktivitas, []);
   if (!Array.isArray(item.aktivitas)) item.aktivitas = [];
   item.spareParts = _safeParseJSON(item.spareParts, []);
   if (!Array.isArray(item.spareParts)) item.spareParts = [];
   return item;
+}
+
+function _buildReportIndex() {
+  if (_reportIndexCache) return _reportIndexCache;
+  _reportIndexCache = new Set();
+  const arr = getData(STORE.REPORTS); // pakai getData agar sanitized
+  arr.forEach(r => {
+    const tag  = (r.tagNo||'').trim().toLowerCase();
+    const name = (r.equipmentName||'').trim().toLowerCase();
+    const unit = (r.unit||'').trim().toLowerCase();
+    if (tag)  _reportIndexCache.add('tag:' + tag);
+    if (name) _reportIndexCache.add('eq:' + name + '|' + unit);
+  });
+  return _reportIndexCache;
 }
 
 function getData(key) {
@@ -1660,7 +1767,33 @@ function setData(key, val) {
     const str = JSON.stringify(val);
     if (_useLS) localStorage.setItem(key, str);
     else _mem[key] = str;
+    _invalidateCache();
+    // Trigger UI refresh untuk halaman yang sedang aktif
+    _onDataChanged(key);
   } catch(e) { console.warn('setData err:', e); }
+}
+
+// Dipanggil setiap kali data berubah — refresh halaman aktif
+let _onDataChangedLock = false;
+function _onDataChanged(changedKey) {
+  if (_onDataChangedLock) return;
+  _onDataChangedLock = true;
+  try {
+    const activePage = document.querySelector('.page.active')?.id || '';
+    updateSidebarBadges();
+    populateUnitFilters();
+
+    if (activePage === 'page-dashboard')         renderDashboard();
+    if (activePage === 'page-schedule')          renderScheduleList();
+    if (activePage === 'page-list')              renderReportList();
+    if (activePage === 'page-input-pm')          renderInputPMPage();
+    if (activePage === 'page-outstanding')       renderOutstandingPage();
+    if (activePage === 'page-takeover')          renderTakeoverPage();
+    if (activePage === 'page-resume')            renderResumePage();
+    if (activePage === 'page-schedule-calendar') renderCalMonthView();
+  } finally {
+    _onDataChangedLock = false;
+  }
 }
 function genId() { return 'PM-' + Date.now() + '-' + Math.random().toString(36).substr(2,6).toUpperCase(); }
 
@@ -1706,49 +1839,68 @@ function setSyncStatus(s, msg) {
   const el = document.getElementById('sync-status');
   if (!el) return;
   const ico = {online:'🟢',syncing:'🔄',offline:'⚫',error:'🟡'};
-  el.textContent = (ico[s]||'⚪') + ' ' + (msg||s);
+  const qCount = _getQueueCount();
+  const qLabel = qCount > 0 ? ` (${qCount} pending)` : '';
+  el.textContent = (ico[s]||'⚪') + ' ' + (msg||s) + qLabel;
   el.className = 'sync-badge sync-' + s;
 }
 
 async function syncFromSheets() {
   if (isSyncing) return;
   isSyncing = true;
-  setSyncStatus('syncing','Sinkronisasi...');
+  setSyncStatus('syncing', 'Sinkronisasi...');
+  document.querySelectorAll('[onclick="syncFromSheets()"]').forEach(b => {
+    b.textContent = '⏳ Sync...'; b.disabled = true;
+  });
   try {
-    console.log('[Sync] Memulai sync...');
-    const [schRes, repRes] = await Promise.all([
-      api('getSchedules').catch(e => { console.error('[Sync] getSchedules error:', e); return {success:false}; }),
-      api('getReports').catch(e => { console.error('[Sync] getReports error:', e); return {success:false}; })
+    const [schRes, repRes] = await Promise.allSettled([
+      api('getSchedules', {}, 2),
+      api('getReports',   {}, 2)
     ]);
-    console.log('[Sync] schRes:', schRes);
-    console.log('[Sync] repRes:', repRes);
-
-    // Hanya pakai data dari Sheets — timpa localStorage sepenuhnya
-    if (schRes.success && Array.isArray(schRes.schedules)) {
-      setData(STORE.SCHEDULES, schRes.schedules);
+    const schOK = schRes.status === 'fulfilled' && schRes.value?.success && Array.isArray(schRes.value.schedules);
+    const repOK = repRes.status === 'fulfilled' && repRes.value?.success && Array.isArray(repRes.value.reports);
+    if (schOK) setData(STORE.SCHEDULES, schRes.value.schedules);
+    if (repOK) {
+      // Sanitize semua field JSON string dari Sheets sebelum disimpan lokal
+      const sanitized = repRes.value.reports.map(_sanitizeReport);
+      setData(STORE.REPORTS, sanitized);
     }
-
-    if (repRes.success && Array.isArray(repRes.reports)) {
-      setData(STORE.REPORTS, repRes.reports);
+    _invalidateCache();
+    if (schOK && repOK) {
+      setSyncStatus('online', 'Tersinkron ' + new Date().toLocaleTimeString('id-ID'));
+      toast('Data tersinkron dari Google Sheets', 'success');
+    } else {
+      setSyncStatus('error', 'Sebagian data gagal sync');
+      toast('⚠ Sebagian data gagal sync', 'warning');
     }
-
-    setSyncStatus('online','Tersinkron ' + new Date().toLocaleTimeString('id-ID'));
-    toast('Data tersinkron dari Google Sheets','success');
     renderAll();
   } catch(e) {
-    setSyncStatus('error','Gagal sync — data lokal');
-    toast('Gagal sync, pakai data lokal','warning');
+    setSyncStatus('error', 'Gagal sync — data lokal');
+    toast('Gagal sync, pakai data lokal', 'warning');
     console.warn('[PM] syncFromSheets error:', e);
-  } finally { isSyncing = false; }
+  } finally {
+    isSyncing = false;
+    document.querySelectorAll('[onclick="syncFromSheets()"]').forEach(b => {
+      b.textContent = '↻ Sync'; b.disabled = false;
+    });
+    flushSyncQueue();
+  }
 }
 
 function renderAll() {
-  renderDashboard();
-  renderInputPMPage();
-  renderScheduleList();
-  renderReportList();
+  const active = document.querySelector('.page.active')?.id || '';
+  _invalidateCache();
   populateUnitFilters();
   updateSidebarBadges();
+  renderDashboard();
+  // Render halaman yang sedang aktif
+  if (active === 'page-schedule')          renderScheduleList();
+  if (active === 'page-list')              renderReportPage();   // FIX: renderReportList hanya reset page, renderReportPage yang render
+  if (active === 'page-input-pm')          renderInputPMPage();
+  if (active === 'page-outstanding')       renderOutstandingPage();
+  if (active === 'page-takeover')          renderTakeoverPage();
+  if (active === 'page-resume')            renderResumePage();
+  if (active === 'page-schedule-calendar') renderCalendar();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1783,10 +1935,15 @@ let _currentPage = 'dashboard';
 let _isNavigatingBack = false;
 
 function showPage(page, fromHistory = false) {
-  // Simpan halaman sekarang ke history kalau ini bukan navigasi balik
+  // Kalau meninggalkan halaman reports, reset form state
+  if (_currentPage === 'reports' && page !== 'reports') {
+    window._activeScheduleId = null;
+    // Jangan clearPMForm() penuh — hanya reset flag
+  }
+
   if (!fromHistory && _currentPage && _currentPage !== page) {
     _pageHistory.push(_currentPage);
-    if (_pageHistory.length > 20) _pageHistory.shift(); // batas history
+    if (_pageHistory.length > 20) _pageHistory.shift();
   }
 
   _currentPage = page;
@@ -1952,29 +2109,47 @@ function clearCalFilters() {
 // ════════════════════════════════════════════════════════
 //  SCHEDULE STATUS
 // ════════════════════════════════════════════════════════
-function hasReport(s, reports) {
-  const sTag  = (s.tagNo||'').trim().toLowerCase();
-  const sName = (s.equipment||'').trim().toLowerCase();
-  const sUnit = (s.unit||'').trim().toLowerCase();
-  return reports.some(r => {
-    if (!r.date) return false;
-    if (sTag && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
-    return (r.equipmentName||'').trim().toLowerCase() === sName
-        && (r.unit||'').trim().toLowerCase() === sUnit;
-  });
+function hasReport(s, customReports) {
+  // Jika ada custom reports (misal filtered), cek manual
+  if (customReports) {
+    const tag  = (s.tagNo||'').trim().toLowerCase();
+    const name = (s.equipment||'').trim().toLowerCase();
+    const unit = (s.unit||'').trim().toLowerCase();
+    return customReports.some(r => {
+      if (tag && r.tagNo && r.tagNo.trim().toLowerCase() === tag) return true;
+      return (r.equipmentName||'').trim().toLowerCase() === name
+          && (r.unit||'').trim().toLowerCase() === unit;
+    });
+  }
+  // Default: pakai index cache
+  const idx  = _buildReportIndex();
+  const tag  = (s.tagNo||'').trim().toLowerCase();
+  const name = (s.equipment||'').trim().toLowerCase();
+  const unit = (s.unit||'').trim().toLowerCase();
+  if (tag  && idx.has('tag:' + tag))              return true;
+  if (name && idx.has('eq:' + name + '|' + unit)) return true;
+  return false;
 }
 
 function getScheduleStatus(s) {
-  const reports = getData(STORE.REPORTS);
-  const today   = new Date(); today.setHours(0,0,0,0);
+  if (!_statusCache) _statusCache = new Map();
+  // Cache tidak berlaku jika tidak ada id
+  if (s.id && _statusCache.has(s.id)) return _statusCache.get(s.id);
+
+  const today    = new Date(); today.setHours(0,0,0,0);
   const curMonth = today.getMonth() + 1;
   const curWeek  = getWeekOfMonth(today);
-  if (hasReport(s, reports)) return 'done';
-  const sMonth = parseInt(s.month) || curMonth;
-  const sWeek  = parseInt(s.week)  || 1;
-  if (sMonth < curMonth) return 'overdue';
-  if (sMonth === curMonth && sWeek < curWeek) return 'overdue';
-  return 'upcoming';
+  const sMonth   = parseInt(s.month) || curMonth;
+  const sWeek    = parseInt(s.week)  || 1;
+
+  let status;
+  if      (hasReport(s))                               status = 'done';
+  else if (sMonth < curMonth)                          status = 'overdue';
+  else if (sMonth === curMonth && sWeek < curWeek)     status = 'overdue';
+  else                                                 status = 'upcoming';
+
+  if (s.id) _statusCache.set(s.id, status);
+  return status;
 }
 
 function getNextDue(s) {
@@ -2365,11 +2540,23 @@ function renderInputPMPage() {
     return sMonth === curMonth && sWeek === curWeek;
   });
 
-  // Progress
+  // Progress — hitung done vs total dari semua schedule minggu ini
+  const allThisWeek = schedules.filter(s => {
+    const sMonth = parseInt(s.month) || curMonth;
+    const sWeek  = parseInt(s.week)  || 1;
+    const st     = getScheduleStatus(s);
+    if (unitF && s.unit !== unitF) return false;
+    if (areaF && s.area !== areaF) return false;
+    return (sMonth === curMonth && sWeek === curWeek) || st === 'overdue';
+  });
+  const totalAll = allThisWeek.length;
+  const doneAll  = allThisWeek.filter(s => getScheduleStatus(s) === 'done').length;
+  const pctAll   = totalAll ? Math.round(doneAll / totalAll * 100) : 0;
+
   const progBar = document.getElementById('ipm-progress-bar');
   const progTxt = document.getElementById('ipm-progress-txt');
-  if (progBar) progBar.style.width = '0%';
-  if (progTxt) progTxt.textContent = `${tugasList.length} tugas`;
+  if (progBar) progBar.style.width = pctAll + '%';
+  if (progTxt) progTxt.textContent = `${doneAll}/${totalAll} selesai`;
 
   const container = document.getElementById('ipm-list');
   if (!container) return;
@@ -2401,7 +2588,7 @@ function renderInputPMPage() {
       const sWeek     = parseInt(s.week)  || 1;
       const leftBorder = isOverdue ? 'var(--red)' : 'var(--orange)';
       const statusPill = isOverdue
-        ? `<span style="background:rgba(192,57,43,.12);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;font-weight:700;border:1px solid rgba(192,57,43,.3)">⚠ OVERDUE ${Math.abs(diffDays)}h</span>`
+        ? `<span style="background:rgba(192,57,43,.12);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;font-weight:700;border:1px solid rgba(192,57,43,.3)">⚠ OVERDUE ${Math.abs(diffDays)} hari</span>`
         : `<span style="background:rgba(230,126,34,.1);color:var(--orange);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 8px;border-radius:3px;border:1px solid rgba(230,126,34,.25)">MINGGU INI</span>`;
 
       return `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border);border-left:3px solid ${leftBorder}">
@@ -2733,15 +2920,7 @@ function renderCalendar() {
 
   _renderMonthPills(year);
 
-  /// Auto-set minggu saat ini kalau bulan yang dipilih adalah bulan ini
-  const weekSel = document.getElementById('cal-filter-week');
-  if (weekSel) {
-    const _nowCal = new Date();
-    const isCurrentMonth = (month === _nowCal.getMonth() + 1) && (year === _nowCal.getFullYear());
-    if (!weekSel.value) {
-      weekSel.value = isCurrentMonth ? String(getWeekOfMonth(_nowCal)) : '';
-    }
-  }
+  // cal-filter-week tidak ada di HTML, blok ini dihapus agar tidak error
 
   renderCalMonthView();
 }
@@ -3093,10 +3272,14 @@ function _checkHasReport(s, month, year, reports) {
   const sTag  = (s.tagNo||'').trim().toLowerCase();
   const sName = (s.equipment||'').trim().toLowerCase();
   const sUnit = (s.unit||'').trim().toLowerCase();
-  return reports.some(r => {
+  const pool  = reports || getData(STORE.REPORTS);
+  return pool.some(r => {
     if (!r.date) return false;
     const d = new Date(r.date);
-    if (d.getFullYear() !== year || d.getMonth() + 1 !== month) return false;
+    // filter bulan/tahun hanya jika keduanya disediakan
+    if (month && year) {
+      if (d.getFullYear() !== year || d.getMonth() + 1 !== month) return false;
+    }
     if (sTag && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
     return (r.equipmentName||'').trim().toLowerCase() === sName
         && (r.unit||'').trim().toLowerCase() === sUnit;
@@ -3132,7 +3315,20 @@ function loadPMTemplate() {
   const type = document.getElementById('pm-equipment-type').value;
   const section = document.getElementById('pm-aktivitas-section');
   const tbody = document.getElementById('pm-aktivitas-tbody');
-  if (!type || !PM_TEMPLATES[type]) { section.style.display='none'; tbody.innerHTML=''; return; }
+  if (!type || !PM_TEMPLATES[type]) {
+    section.style.display = 'none';
+    tbody.innerHTML = '';
+    // Reset progress
+    const elDone  = document.getElementById('checklist-done-count');
+    const elTotal = document.getElementById('checklist-total-count');
+    const elBar   = document.getElementById('checklist-progress-bar');
+    const elPct   = document.getElementById('checklist-progress-pct');
+    if (elDone)  elDone.textContent  = '0';
+    if (elTotal) elTotal.textContent = '0';
+    if (elBar)   elBar.style.width   = '0%';
+    if (elPct)   elPct.textContent   = '0%';
+    return;
+  }
   section.style.display = 'block';
   tbody.innerHTML = PM_TEMPLATES[type].map((item, i) => `
     <tr>
@@ -3146,6 +3342,9 @@ function loadPMTemplate() {
       </td>
       <td style="padding:4px"><input type="text" class="aktivitas-ket pm-keterangan" placeholder="Catatan..."></td>
     </tr>`).join('');
+  // Reset WO bar dan progress setiap ganti template
+  const woBar = document.getElementById('wo-summary-bar');
+  if (woBar) woBar.style.display = 'none';
   _updateChecklistProgress();
 }
 
@@ -3275,9 +3474,11 @@ function collectPMData() {
   const month = dateVal ? new Date(dateVal + 'T00:00:00').getMonth() + 1 : new Date().getMonth() + 1;
 
   return {
-    tagNo: document.getElementById('pm-tagno').value.trim(),
-    date: dateVal,
+    tagNo:         document.getElementById('pm-tagno').value.trim(),
+    date:          dateVal,
     equipmentType: document.getElementById('pm-equipment-type').value,
+    week:          parseInt(document.getElementById('pm-week')?.value) || getWeekOfMonth(new Date()),
+    month:         dateVal ? new Date(dateVal + 'T00:00:00').getMonth() + 1 : new Date().getMonth() + 1,
     equipmentName: document.getElementById('pm-equipment-name').value.trim(),
     unit: document.getElementById('pm-unit').value.trim(),
     area: document.getElementById('pm-area').value.trim(),
@@ -3304,6 +3505,25 @@ async function submitPM() {
   const editId = document.getElementById('pm-edit-id')?.value || '';
   const isEdit = !!editId;
 
+  // Cek duplikat — hanya untuk submit baru, bukan edit
+  if (!isEdit) {
+    const existing = getData(STORE.REPORTS);
+    const d = new Date(data.date);
+    const duplikat = existing.find(r => {
+      if (!r.date) return false;
+      const rd = new Date(r.date);
+      const sameMonth = rd.getFullYear() === d.getFullYear() && rd.getMonth() === d.getMonth();
+      const sameEq = (r.tagNo && data.tagNo && r.tagNo.trim().toLowerCase() === data.tagNo.trim().toLowerCase())
+        || (r.equipmentName||'').trim().toLowerCase() === (data.equipmentName||'').trim().toLowerCase();
+      return sameMonth && sameEq;
+    });
+    if (duplikat) {
+      const tgl = new Date(duplikat.date).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
+      const konfirmasi = confirm(`⚠ Laporan untuk "${data.equipmentName}" di bulan ini sudah ada (${tgl}).\n\nTetap submit laporan baru?`);
+      if (!konfirmasi) return;
+    }
+  }
+
   const reports = getData(STORE.REPORTS);
   let report;
 
@@ -3321,14 +3541,21 @@ async function submitPM() {
   setData(STORE.REPORTS, reports);
   updateScheduleLastDone(data.equipmentName, data.date);
 
-  // Jika berasal dari eksekusi schedule langsung, mark done sekalian
   if (window._activeScheduleId && !isEdit) {
-    await markPMDone(window._activeScheduleId);
     window._activeScheduleId = null;
   }
+
+  // Force invalidate cache setelah dua setData di atas
+  _invalidateCache();
+
+  // Refresh semua halaman terdampak
   renderDashboard();
-  renderReportList();
+  renderReportPage();
+  renderInputPMPage();
+  renderOutstandingPage();
+  renderScheduleList();
   populateUnitFilters();
+  updateSidebarBadges();
 
   const msg = document.getElementById('pm-success-msg');
   if (msg) { msg.style.display='block'; setTimeout(()=>msg.style.display='none',5000); }
@@ -3352,26 +3579,45 @@ async function _syncReportToSheets(report) {
   try {
     const res = await api('saveReport', { report: serializeReport(report) });
     if (res.success) {
-      setSyncStatus('online','Tersinkron ke Sheets ✓');
+      setSyncStatus('online', 'Tersinkron ke Sheets ✓');
       toast('☁ Tersinkron ke Google Sheets', 'success');
+      flushSyncQueue(); // coba kirim yang pending juga
     } else {
-      setSyncStatus('error','Sync gagal — data aman lokal');
-      toast('⚠ Sync gagal: ' + (res.message||'unknown'), 'warning');
-      console.warn('[PM] saveReport gagal:', res);
+      enqueueSync('saveReport', { report: serializeReport(report) });
+      setSyncStatus('error', 'Masuk antrian sync');
+      toast('⚠ Gagal sync — masuk antrian otomatis', 'warning');
     }
   } catch(e) {
-    setSyncStatus('error','Offline — data aman lokal');
-    console.warn('[PM] saveReport exception:', e);
+    enqueueSync('saveReport', { report: serializeReport(report) });
+    setSyncStatus('offline', 'Offline — antrian: ' + _getQueueCount() + ' item');
   }
+}
+
+function _getQueueCount() {
+  try { return JSON.parse(localStorage.getItem(STORE_QUEUE)||'[]').length; } catch { return 0; }
 }
 
 // Serialize nested fields to JSON string for Sheets storage
 function serializeReport(r) {
   return {
-    ...r,
-    ppe: r.ppe || {},
-    aktivitas: JSON.stringify(r.aktivitas || []),
-    spareParts: JSON.stringify(r.spareParts || [])
+    id:            r.id            || '',
+    tagNo:         r.tagNo         || '',
+    date:          r.date          || '',
+    equipmentType: r.equipmentType || '',
+    equipmentName: r.equipmentName || '',
+    unit:          r.unit          || '',
+    area:          r.area          || '',
+    periode:       r.periode       || '',
+    week:          r.week          || '',
+    month:         r.month         || '',
+    teknisi:       r.teknisi       || '',
+    approval:      r.approval      || '',
+    notes:         r.notes         || '',
+    submittedAt:   r.submittedAt   || '',
+    updatedAt:     r.updatedAt     || '',
+    ppe:           JSON.stringify(r.ppe        || {}),
+    aktivitas:     JSON.stringify(r.aktivitas  || []),
+    spareParts:    JSON.stringify(r.spareParts || [])
   };
 }
 
@@ -3382,13 +3628,21 @@ function updateScheduleLastDone(equipName, date) {
     if ((s.equipment||'').toLowerCase() === (equipName||'').toLowerCase()) {
       s.lastDone = date;
       changed = true;
-      // FIX: sync lastDone ke Google Sheets
-      if (!SHEETS_URL.includes('GANTI_DENGAN')) {
-        api('markDone', { id: s.id, lastDone: date }).catch(() => {});
-      }
     }
   });
-  if (changed) setData(STORE.SCHEDULES, schedules);
+  if (!changed) return;
+  setData(STORE.SCHEDULES, schedules);
+  // Sync ke Sheets — gunakan updateSchedule bukan markDone
+  if (!SHEETS_URL.includes('GANTI_DENGAN')) {
+    const updated = schedules.filter(s =>
+      (s.equipment||'').toLowerCase() === (equipName||'').toLowerCase()
+    );
+    updated.forEach(s => {
+      api('updateSchedule', { schedule: s }).catch(e =>
+        console.warn('[PM] updateScheduleLastDone sync gagal:', e)
+      );
+    });
+  }
 }
 
 function editReport(id) {
@@ -3487,9 +3741,28 @@ function eksekusiPM(scheduleId) {
   el('pm-date').value = new Date().toISOString().split('T')[0];
   el('pm-week').value = getWeekOfMonth(new Date());
 
-  // Set equipment type dan langsung load template checklist
-  if (s.equipmentType && el('pm-equipment-type')) {
-    el('pm-equipment-type').value = s.equipmentType;
+  // Set equipment type — coba dari schedule, fallback auto-detect dari nama
+  let eqType = s.equipmentType || '';
+  if (!eqType) {
+    // Auto-detect dari nama equipment
+    const nameLower = (s.equipment||'').toLowerCase();
+    if (nameLower.includes('blower'))          eqType = 'blower';
+    else if (nameLower.includes('belt'))       eqType = 'belt_conveyor';
+    else if (nameLower.includes('bucket'))     eqType = 'bucket_elevator';
+    else if (nameLower.includes('compressor')) eqType = 'compressor';
+    else if (nameLower.includes('dust'))       eqType = 'dust_collector';
+    else if (nameLower.includes('screw'))      eqType = 'screw_conveyor';
+    else if (nameLower.includes('panel'))      eqType = 'electric_panel';
+    else if (nameLower.includes('dryer'))      eqType = 'air_dryer';
+    else if (nameLower.includes('gravity'))    eqType = 'gravity';
+    else if (nameLower.includes('sheller'))    eqType = 'sheller';
+    else if (nameLower.includes('cleaner'))    eqType = 'cleaner';
+    else if (nameLower.includes('treater'))    eqType = 'treater';
+    else if (nameLower.includes('packing'))    eqType = 'packing_machine';
+    else if (nameLower.includes('sliding') || nameLower.includes('hopper')) eqType = 'sliding_gate';
+  }
+  if (eqType && el('pm-equipment-type')) {
+    el('pm-equipment-type').value = eqType;
     loadPMTemplate();
   }
 
@@ -3505,6 +3778,7 @@ function eksekusiPM(scheduleId) {
 
 
 function clearPMForm(silent = false) {
+  window._activeScheduleId = null; // selalu reset saat form dibersihkan
   ['pm-tagno','pm-equipment-name','pm-unit','pm-area','pm-teknisi','pm-approval','pm-notes'].forEach(id => {
     const el = document.getElementById(id); if (el) el.value='';
   });
@@ -3636,9 +3910,13 @@ async function saveSchedule() {
   } else schedules.push(item);
   setData(STORE.SCHEDULES, schedules);
   closeOverlay('scheduleOverlay');
+  // _onDataChanged otomatis dari setData, tapi pastikan ini juga jalan
   renderScheduleList();
   renderDashboard();
+  renderInputPMPage();
+  renderOutstandingPage();
   populateUnitFilters();
+  updateSidebarBadges();
   toast(editId?'Schedule diperbarui':'Schedule ditambahkan','success');
 
   if (!SHEETS_URL.includes('GANTI_DENGAN')) {
@@ -3871,7 +4149,10 @@ async function deleteSchedule(id) {
     closeOverlay('deleteOverlay');
     renderScheduleList();
     renderDashboard();
+    renderInputPMPage();
+    renderOutstandingPage();
     populateUnitFilters();
+    updateSidebarBadges();
     toast('Schedule dihapus','info');
     if (!SHEETS_URL.includes('GANTI_DENGAN')) {
       try { await api('deleteSchedule',{id}); } catch(e){}
@@ -3903,6 +4184,9 @@ async function deleteReport(id) {
     closeOverlay('deleteOverlay');
     renderReportPage();
     renderDashboard();
+    renderInputPMPage();
+    renderOutstandingPage();
+    updateSidebarBadges();
     toast('Laporan dihapus','info');
     if (!SHEETS_URL.includes('GANTI_DENGAN')) {
       try { await api('deleteReport',{id}); } catch(e){}
@@ -4367,13 +4651,13 @@ function buildPMFullHTML(data, sig = null) {
     <div style="font-size:7.5pt;color:#666;margin-top:3px">Tgl: ${formattedDate}</div>
   </td>
   <td class="sc">
-    <div style="font-weight:bold;font-size:8.5pt">Disetujui Oleh<br><span style="font-weight:normal;font-size:8pt">Supervisor / Manager</span></div>
+    <div style="font-weight:bold;font-size:8.5pt">Disetujui Oleh<br><span style="font-weight:normal;font-size:8pt">Leader Unit</span></div>
     ${spvSigCell}
     <div style="font-size:8pt;font-weight:600;margin-top:6px">${sig?.spvName||data.approval||'_______________'}</div>
     <div style="font-size:7.5pt;color:#666;margin-top:3px">Tgl: ${spvDate}</div>
   </td>
   <td class="sc">
-    <div style="font-weight:bold;font-size:8.5pt">Mengetahui<br><span style="font-weight:normal;font-size:8pt">Leader / Kepala Regu</span></div>
+    <div style="font-weight:bold;font-size:8.5pt">Mengetahui<br><span style="font-weight:normal;font-size:8pt">Owner Area</span></div>
     ${ldSigCell}
     <div style="font-size:8pt;font-weight:600;margin-top:6px">${sig?.leaderName||'_______________'}</div>
     <div style="font-size:7.5pt;color:#666;margin-top:3px">Tgl: ${ldDate}</div>
@@ -5264,11 +5548,15 @@ function openTakeoverModal(schedId) {
 function executeTakeover(schedId) {
   const schedules = getData(STORE.SCHEDULES);
   const s = schedules.find(x => x.id === schedId);
-  if (!s) return;
+  if (!s) { toast('Schedule tidak ditemukan','error'); return; }
 
-  const newMonth = parseInt(document.getElementById('tko-new-month')?.value);
-  const newWeek  = parseInt(document.getElementById('tko-new-week')?.value);
-  const reason   = document.getElementById('tko-reason')?.value?.trim() || '';
+  const newMonthEl = document.getElementById('tko-new-month');
+  const newWeekEl  = document.getElementById('tko-new-week');
+  const reasonEl   = document.getElementById('tko-reason');
+
+  const newMonth = parseInt(newMonthEl?.value);
+  const newWeek  = parseInt(newWeekEl?.value);
+  const reason   = reasonEl?.value?.trim() || '';
 
   if (!newMonth || !newWeek) { toast('Pilih bulan dan minggu tujuan','error'); return; }
 
@@ -5283,7 +5571,6 @@ function executeTakeover(schedId) {
   setData(STORE.SCHEDULES, schedules);
   closeOverlay('deleteOverlay');
 
-  // Reset delete button
   document.getElementById('delete-confirm-btn').textContent = '🗑 HAPUS';
   document.getElementById('delete-confirm-btn').className = 'btn-red';
 
@@ -5291,6 +5578,7 @@ function executeTakeover(schedId) {
   renderOutstandingPage();
   renderScheduleList();
   renderDashboard();
+  renderInputPMPage();
   updateSidebarBadges();
   toast(`🔄 PM "${s.equipment}" berhasil di-takeover ke ${MONTHS_ID[newMonth-1]} Minggu ${newWeek}`, 'success');
 
@@ -5345,11 +5633,12 @@ function bulkTakeover() {
     renderOutstandingPage();
     renderScheduleList();
     renderDashboard();
+    renderInputPMPage();
     updateSidebarBadges();
     toast(`🔄 ${toTakeover.length} schedule di-takeover ke ${MONTHS_ID[curMonth-1]} Minggu ${curWeek}`, 'success');
-  };
+  };  // tutup onclick handler
   openOverlay('deleteOverlay');
-}
+}   // tutup fungsi bulkTakeover
 
 function updateSidebarBadges() {
   const schedules  = getData(STORE.SCHEDULES);
@@ -5430,6 +5719,8 @@ function _updateWOBar() {
   const list = document.getElementById('wo-summary-list');
   const btn  = document.getElementById('wo-summary-btn');
   if (!bar || !list) return;
+  // Reset state tombol dulu
+  if (btn) { btn.disabled = false; btn.style.opacity = '1'; btn.textContent = '⚠ Buat WO dari Laporan Ini'; }
 
   const anomaliItems = [];
   document.querySelectorAll('#pm-aktivitas-tbody tr').forEach(row => {
@@ -5552,12 +5843,8 @@ async function simpanWOdariPM() {
       materialRequests: JSON.stringify(wo.materialRequests || [])
     };
 
-    // Coba via fetch GET dengan action parameter langsung
-    const params = new URLSearchParams({
-      action: 'saveWO',
-      _body: JSON.stringify({ action: 'saveWO', wo: woForSheets })
-    });
-    const res = await fetch(`${WO_URL}?${params.toString()}`);
+    const payload = encodeURIComponent(JSON.stringify({ action: 'saveWO', wo: woForSheets }));
+    const res  = await fetch(`${WO_URL}?data=${payload}`);
     const json = await res.json();
 
     if (json?.success) {
@@ -5624,16 +5911,44 @@ function bukaWOdariDaftarLaporan(pmId) {
       <button class="modal-close" onclick="closeOverlay('woFromPMOverlay')">×</button>
     </div>
     <div class="modal-body">
-      <div style="margin-bottom:16px">
-        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);letter-spacing:.06em;text-transform:uppercase;margin-bottom:8px">Daftar Anomali yang Ditemukan</div>
-        <div id="wo-anomali-list" style="padding:10px 14px;background:rgba(192,57,43,.05);border:1px solid rgba(192,57,43,.2);border-radius:7px"></div>
+
+      <!-- Info Equipment (readonly) -->
+      <div class="form-grid" style="margin-bottom:14px">
+        <div class="fg">
+          <span class="flabel">Equipment</span>
+          <input class="finput" type="text" id="wo-equipment" readonly style="background:var(--bg3);color:var(--text2)">
+        </div>
+        <div class="fg">
+          <span class="flabel">Tag No</span>
+          <input class="finput" type="text" id="wo-tagno" readonly style="background:var(--bg3);color:var(--text2)">
+        </div>
+        <div class="fg">
+          <span class="flabel">Unit / Area</span>
+          <input class="finput" type="text" id="wo-unit-area" readonly style="background:var(--bg3);color:var(--text2)">
+        </div>
+        <div class="fg">
+          <span class="flabel">Teknisi PM (referensi)</span>
+          <input class="finput" type="text" id="wo-teknisi-ref" readonly style="background:var(--bg3);color:var(--text2)">
+        </div>
       </div>
+
+      <!-- Daftar Anomali -->
+      <div style="margin-bottom:14px">
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--red);letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">
+          ⚠ Daftar Anomali yang Ditemukan
+        </div>
+        <div id="wo-anomali-list"
+          style="padding:10px 14px;background:rgba(192,57,43,.05);border:1px solid rgba(192,57,43,.2);border-radius:7px;max-height:160px;overflow-y:auto">
+        </div>
+      </div>
+
+      <!-- Form WO -->
       <div class="form-grid">
-        <div class="fg"><span class="flabel">Equipment</span><input class="finput" type="text" id="wo-equipment" readonly style="background:var(--bg3)"></div>
-        <div class="fg"><span class="flabel">Tag No</span><input class="finput" type="text" id="wo-tagno" readonly style="background:var(--bg3)"></div>
-        <div class="fg"><span class="flabel">Unit / Area</span><input class="finput" type="text" id="wo-unit-area" readonly style="background:var(--bg3)"></div>
-        <div class="fg"><span class="flabel">Teknisi PM (referensi)</span><input class="finput" type="text" id="wo-teknisi-ref" readonly style="background:var(--bg3)"></div>
-        <div class="fg full"><span class="flabel">Deskripsi Pekerjaan WO *</span><textarea class="ftextarea" id="wo-deskripsi" rows="4" placeholder="Detail pekerjaan yang harus dilakukan..."></textarea></div>
+        <div class="fg full">
+          <span class="flabel">Deskripsi Pekerjaan WO *</span>
+          <textarea class="ftextarea" id="wo-deskripsi" rows="4"
+            placeholder="Detail pekerjaan yang harus dilakukan..."></textarea>
+        </div>
         <div class="fg">
           <span class="flabel">Prioritas</span>
           <select class="fsel2" id="wo-prioritas">
@@ -5642,11 +5957,17 @@ function bukaWOdariDaftarLaporan(pmId) {
             <option value="high">🔴 High — Tangani hari ini</option>
           </select>
         </div>
-        <div class="fg"><span class="flabel">Ditugaskan Kepada</span><input class="finput" type="text" id="wo-assignee" placeholder="Nama teknisi / tim pelaksana"></div>
+        <div class="fg">
+          <span class="flabel">Ditugaskan Kepada</span>
+          <input class="finput" type="text" id="wo-assignee"
+            placeholder="Nama teknisi / tim pelaksana">
+        </div>
       </div>
+
       <div class="form-actions">
         <button class="btn-ghost" onclick="closeOverlay('woFromPMOverlay')">Batal</button>
-        <button class="btn-red" onclick="simpanWOdariPM()" style="min-width:180px">⚠ SIMPAN WORK ORDER</button>
+        <button class="btn-red" onclick="simpanWOdariPM()"
+          style="min-width:180px">⚠ SIMPAN WORK ORDER</button>
       </div>
     </div>
   </div>
