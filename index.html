@@ -1138,8 +1138,11 @@ button,select,input{touch-action:manipulation}
       <span style="color:var(--text3)">🔍</span>
       <input type="text" id="rep-search" placeholder="Cari tag, equipment, teknisi, area..." oninput="renderReportList()"/>
     </div>
-    <select class="fsel" id="rep-filter-unit" onchange="renderReportList()">
+    <select class="fsel" id="rep-filter-unit" onchange="onRepUnitChange()">
       <option value="">Semua Unit</option>
+    </select>
+    <select class="fsel" id="rep-filter-area" onchange="renderReportList()">
+      <option value="">Semua Area</option>
     </select>
     <select class="fsel" id="rep-filter-type" onchange="renderReportList()">
       <option value="">Semua Tipe</option>
@@ -2085,6 +2088,16 @@ function populateUnitFilters() {
     const cur = repUnitSel.value;
     repUnitSel.innerHTML = '<option value="">Semua Unit</option>' + repUnits.map(u=>`<option value="${u}">${u}</option>`).join('');
     repUnitSel.value = cur;
+  }
+
+  // Report area filter - populate based on current unit selection
+  const repAreaSel = document.getElementById('rep-filter-area');
+  if (repAreaSel) {
+    const curRepUnit = repUnitSel?.value || '';
+    const repAreas = [...new Set(reports.filter(r=>!curRepUnit||r.unit===curRepUnit).map(r=>r.area||'').filter(Boolean))].sort();
+    const curArea = repAreaSel.value;
+    repAreaSel.innerHTML = '<option value="">Semua Area</option>' + repAreas.map(a=>`<option value="${a}">${a}</option>`).join('');
+    repAreaSel.value = curArea;
   }
 }
 
@@ -3989,6 +4002,18 @@ function onSchUnitChange() {
   renderScheduleList();
 }
 
+function onRepUnitChange() {
+  const unit = document.getElementById('rep-filter-unit')?.value || '';
+  const areaSel = document.getElementById('rep-filter-area');
+  if (!areaSel) return;
+  const reports = getData(STORE.REPORTS);
+  const areas = [...new Set(
+    reports.filter(r => !unit || r.unit === unit).map(r => r.area||'').filter(Boolean)
+  )].sort();
+  areaSel.innerHTML = '<option value="">Semua Area</option>' + areas.map(a => `<option value="${a}">${a}</option>`).join('');
+  renderReportList();
+}
+
 function _hasReportThisYear(s) {
   const curYear = new Date().getFullYear();
   const reports = getData(STORE.REPORTS);
@@ -4196,9 +4221,15 @@ function renderReportList() { repPage=0; renderReportPage(); }
 function changeRepPage(dir) { repPage=Math.max(0,repPage+dir); renderReportPage(); }
 
 function clearRepFilters() {
-  ['rep-search','rep-filter-unit','rep-filter-type','rep-filter-periode'].forEach(id=>{
+  ['rep-search','rep-filter-unit','rep-filter-area','rep-filter-type','rep-filter-periode'].forEach(id=>{
     const el=document.getElementById(id); if(el) el.value='';
   });
+  const areaSel = document.getElementById('rep-filter-area');
+  if (areaSel) {
+    const reports = getData(STORE.REPORTS);
+    const areas = [...new Set(reports.map(r=>r.area||'').filter(Boolean))].sort();
+    areaSel.innerHTML = '<option value="">Semua Area</option>' + areas.map(a=>`<option value="${a}">${a}</option>`).join('');
+  }
   renderReportList();
 }
 
@@ -4697,12 +4728,14 @@ function renderReportPage() {
   const reports = getData(STORE.REPORTS);
   const search = (document.getElementById('rep-search')?.value||'').toLowerCase();
   const unitF = document.getElementById('rep-filter-unit')?.value||'';
+  const areaF = document.getElementById('rep-filter-area')?.value||'';
   const typeF = document.getElementById('rep-filter-type')?.value||'';
   const periodeF = document.getElementById('rep-filter-periode')?.value||'';
 
   let filtered = reports.filter(r => {
     if (search && ![(r.tagNo||''),(r.equipmentName||''),(r.teknisi||''),(r.area||''),(r.unit||'')].some(v=>v.toLowerCase().includes(search))) return false;
     if (unitF && r.unit !== unitF) return false;
+    if (areaF && r.area !== areaF) return false;
     if (typeF && r.equipmentType !== typeF) return false;
     if (periodeF && r.periode !== periodeF) return false;
     return true;
