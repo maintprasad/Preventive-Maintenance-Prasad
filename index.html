@@ -4,7 +4,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no"/>
 <title>Prasad Seeds — Preventive Maintenance</title>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Sacramento&family=Alex+Brush&family=Pacifico&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 :root{
@@ -1129,6 +1129,7 @@ button,select,input{touch-action:manipulation}
       <div class="sec-sub" id="report-count-lbl">—</div>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="btn-primary" onclick="printAllPMReports()">🖨 Print Semua</button>
       <button class="btn-ghost" onclick="exportReportsCSV()">⬇ CSV</button>
     </div>
   </div>
@@ -1578,7 +1579,8 @@ button,select,input{touch-action:manipulation}
             <span class="flabel">Nama Leader</span>
             <input class="finput" type="text" id="sig-spv-name" placeholder="Nama lengkap Leader">
           </div>
-          <div class="fg" style="justify-content:flex-end;padding-top:18px">
+          <div class="fg" style="justify-content:flex-end;padding-top:18px;flex-direction:row;gap:6px">
+            <button class="btn-primary" style="font-size:10px;flex:1" onclick="generateArtisticSignature('spv')">✒️ Generate Otomatis</button>
             <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('spv')">🗑 Hapus TTD</button>
           </div>
         </div>
@@ -1597,7 +1599,8 @@ button,select,input{touch-action:manipulation}
             <span class="flabel">Nama Owner</span>
             <input class="finput" type="text" id="sig-leader-name" placeholder="Nama lengkap Leader">
           </div>
-          <div class="fg" style="justify-content:flex-end;padding-top:18px">
+          <div class="fg" style="justify-content:flex-end;padding-top:18px;flex-direction:row;gap:6px">
+            <button class="btn-primary" style="font-size:10px;flex:1" onclick="generateArtisticSignature('leader')">✒️ Generate Otomatis</button>
             <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('leader')">🗑 Hapus TTD</button>
           </div>
         </div>
@@ -4287,6 +4290,7 @@ function toast(msg, type='info') {
 // ════════════════════════════════════════════════════════
 const STORE_TMPL = 'pm_custom_templates_v1';
 const STORE_SIGS = 'pm_signatures_v1';
+const STORE_NAME_SIGS = 'pm_name_signatures_v1'; // library tanda tangan otomatis per nama
 
 // Backup default templates (untuk reset)
 const PM_TEMPLATES_BACKUP = JSON.parse(JSON.stringify(PM_TEMPLATES));
@@ -4591,6 +4595,107 @@ function clearSigCanvas(role) {
   document.getElementById('sig-' + role + '-saved').style.display = 'none';
 }
 
+// ════════════════════════════════════════════════════════
+//  GENERATE TANDA TANGAN ARTISTIK OTOMATIS (per nama, khas & konsisten)
+// ════════════════════════════════════════════════════════
+const _sigFonts = ['"Dancing Script"','"Great Vibes"','"Sacramento"','"Alex Brush"','"Pacifico"'];
+const _sigInkColors = ['#12203f','#1a1a2e','#111111','#14213d','#20263d'];
+
+function _hashName(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0;
+  }
+  return h;
+}
+
+function getNameSigCache() {
+  try { return JSON.parse(localStorage.getItem(STORE_NAME_SIGS) || '{}'); } catch { return {}; }
+}
+function saveNameSigCache(key, data) {
+  const cache = getNameSigCache();
+  cache[key] = { ...data, updatedAt: new Date().toISOString() };
+  try { localStorage.setItem(STORE_NAME_SIGS, JSON.stringify(cache)); } catch(e) {}
+}
+
+// Menggambar tanda tangan artistik ke canvas — gaya, kemiringan, warna, dan
+// lekukan flourish dihitung dari hash nama, sehingga tiap nama punya "ciri khas"
+// sendiri yang konsisten setiap kali di-generate ulang.
+async function drawArtisticSignatureToCanvas(canvas, name) {
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const h      = _hashName(name.toLowerCase().trim());
+  const font   = _sigFonts[h % _sigFonts.length];
+  const color  = _sigInkColors[(h >> 4) % _sigInkColors.length];
+  const angle  = (((h >> 3) % 7) - 3) * Math.PI / 180; // -3° s/d 3°
+
+  let fontSize = 64;
+  try { await document.fonts.load(`italic ${fontSize}px ${font}`); } catch(e) {}
+
+  ctx.font = `italic ${fontSize}px ${font}`;
+  const maxW = canvas.width - 90;
+  let tw = ctx.measureText(name).width;
+  while (tw > maxW && fontSize > 22) {
+    fontSize -= 2;
+    ctx.font = `italic ${fontSize}px ${font}`;
+    tw = ctx.measureText(name).width;
+  }
+
+  const cx = canvas.width / 2, cy = canvas.height / 2 - 6;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(name, 0, 0);
+  ctx.restore();
+
+  // Flourish garis bawah — bentuk lengkung unik per nama
+  const baseY  = cy + fontSize * 0.42;
+  const spread = Math.min(maxW, tw + 40);
+  const x0 = cx - spread / 2, x1 = cx + spread / 2;
+  const wob1 = ((h >> 5) % 20) - 10;
+  const wob2 = ((h >> 9) % 20) - 10;
+
+  ctx.beginPath();
+  ctx.moveTo(x0, baseY);
+  ctx.bezierCurveTo(cx - spread*0.2, baseY + 10 + wob1, cx + spread*0.2, baseY - 10 + wob2, x1, baseY);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+
+  // Flourish kecil di awal (ciri khas tambahan)
+  ctx.beginPath();
+  ctx.moveTo(x0, baseY);
+  ctx.quadraticCurveTo(x0 - 14, baseY - 16 - ((h >> 2) % 10), x0 - 2, baseY - 4);
+  ctx.stroke();
+
+  return canvas.toDataURL('image/png');
+}
+
+async function generateArtisticSignature(role) {
+  const nameInput = document.getElementById(role === 'spv' ? 'sig-spv-name' : 'sig-leader-name');
+  const name = (nameInput?.value || '').trim();
+  if (!name) { toast('Isi nama terlebih dahulu sebelum generate tanda tangan', 'error'); return; }
+
+  const canvas = document.getElementById('sig-canvas-' + role);
+  if (!canvas) return;
+
+  const dataUrl = await drawArtisticSignatureToCanvas(canvas, name);
+
+  document.getElementById('sig-' + role + '-hint').style.display = 'none';
+  const savedLabel = document.getElementById('sig-' + role + '-saved');
+  savedLabel.style.display = 'block';
+  savedLabel.textContent = '✓ Tanda tangan otomatis dibuat — klik "SIMPAN & BUKA PDF" untuk menyimpan permanen';
+
+  // Simpan ke library tanda tangan per nama di localStorage
+  saveNameSigCache(name.toLowerCase(), { name, dataUrl, font: '' });
+
+  toast(`✒️ Tanda tangan otomatis untuk "${name}" berhasil dibuat`, 'success');
+}
+
 function isCanvasBlank(canvasId) {
   const c = document.getElementById(canvasId); if (!c) return true;
   return !c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v => v !== 0);
@@ -4643,7 +4748,7 @@ function openPDFOverlay(data, sig = null) {
   openOverlay('pdfOverlay');
 }
 
-function buildPMFullHTML(data, sig = null) {
+function buildPMBodyContent(data, sig = null) {
   if (typeof data.ppe === 'string') { try{data.ppe=JSON.parse(data.ppe);}catch(e){data.ppe={};} }
   if (typeof data.aktivitas === 'string') { try{data.aktivitas=JSON.parse(data.aktivitas);}catch(e){data.aktivitas=[];} }
   if (typeof data.spareParts === 'string') { try{data.spareParts=JSON.parse(data.spareParts);}catch(e){data.spareParts=[];} }
@@ -4671,9 +4776,7 @@ function buildPMFullHTML(data, sig = null) {
   const ldSigCell  = sig?.leaderSig ? `<img src="${sig.leaderSig}" style="height:58px;max-width:170px;display:block;margin:4px auto">` : '<div style="height:58px;border-bottom:1px solid #bbb;margin:4px 14px"></div>';
   const spvDate = sig?.spvAt ? new Date(sig.spvAt).toLocaleDateString('id-ID') : '_______________';
   const ldDate  = sig?.leaderAt ? new Date(sig.leaderAt).toLocaleDateString('id-ID') : '_______________';
-  return `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>PM Report — ${data.tagNo||''}</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A4 portrait;margin:12mm 14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;background:#fff}table{width:100%;border-collapse:collapse}.il{background:#eef3ee;padding:5px 10px;font-weight:600;font-size:8.5pt;width:110px;color:#1a3a6b;border:1px solid #ccc}.iv{padding:5px 10px;font-size:9pt;border:1px solid #ccc}.st{background:#1a3a6b;color:#fff;padding:6px 12px;font-size:9pt;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px}.th{background:#1a3a6b;color:rgba(255,255,255,.85);padding:6px 8px;font-size:8pt;letter-spacing:.04em;text-transform:uppercase;border:1px solid #2a4a7b}.sc{padding:10px 12px;border:1px solid #ccc;text-align:center;width:33.3%}.ft{margin-top:8px;padding:4px 0;font-size:7.5pt;color:#999;border-top:1px solid #eee;text-align:center}</style>
-</head><body>
+  return `
 <table style="border:2px solid #1a3a6b;margin-bottom:0"><tr>
   <td style="width:68px;padding:8px 10px;border-right:2px solid #1a3a6b;vertical-align:middle"><div style="width:52px;height:38px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:7pt;color:#aaa">LOGO</div></td>
   <td style="text-align:center;padding:8px;border-right:2px solid #1a3a6b;vertical-align:middle"><div style="font-size:13pt;font-weight:900;color:#1a3a6b">PREVENTIVE MAINTENANCE REPORT</div><div style="font-size:8pt;color:#666;margin-top:2px">PT PRASAD SEEDS INDONESIA</div></td>
@@ -4720,8 +4823,69 @@ function buildPMFullHTML(data, sig = null) {
     <div style="font-size:7.5pt;color:#666;margin-top:3px">Tgl: ${ldDate}</div>
   </td>
 </tr></table>
-<div class="ft">Report ID: ${data.id||'—'} | PM Dashboard — PT Prasad Seeds Indonesia | Dicetak: ${printDate}</div>
+<div class="ft">Report ID: ${data.id||'—'} | PM Dashboard — PT Prasad Seeds Indonesia | Dicetak: ${printDate}</div>`;
+}
+
+function buildPMFullHTML(data, sig = null) {
+  return `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>PM Report — ${data.tagNo||''}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A4 portrait;margin:12mm 14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;background:#fff}table{width:100%;border-collapse:collapse}.il{background:#eef3ee;padding:5px 10px;font-weight:600;font-size:8.5pt;width:110px;color:#1a3a6b;border:1px solid #ccc}.iv{padding:5px 10px;font-size:9pt;border:1px solid #ccc}.st{background:#1a3a6b;color:#fff;padding:6px 12px;font-size:9pt;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px}.th{background:#1a3a6b;color:rgba(255,255,255,.85);padding:6px 8px;font-size:8pt;letter-spacing:.04em;text-transform:uppercase;border:1px solid #2a4a7b}.sc{padding:10px 12px;border:1px solid #ccc;text-align:center;width:33.3%}.ft{margin-top:8px;padding:4px 0;font-size:7.5pt;color:#999;border-top:1px solid #eee;text-align:center}</style>
+</head><body>
+${buildPMBodyContent(data, sig)}
 </body></html>`;
+}
+
+// ════════════════════════════════════════════════════════
+//  PRINT SEMUA LAPORAN PM SEKALIGUS
+// ════════════════════════════════════════════════════════
+function printAllPMReports() {
+  const reports  = getData(STORE.REPORTS);
+  const search   = (document.getElementById('rep-search')?.value||'').toLowerCase();
+  const unitF    = document.getElementById('rep-filter-unit')?.value||'';
+  const areaF    = document.getElementById('rep-filter-area')?.value||'';
+  const typeF    = document.getElementById('rep-filter-type')?.value||'';
+  const periodeF = document.getElementById('rep-filter-periode')?.value||'';
+
+  let filtered = reports.filter(r => {
+    if (search && ![(r.tagNo||''),(r.equipmentName||''),(r.teknisi||''),(r.area||''),(r.unit||'')].some(v=>v.toLowerCase().includes(search))) return false;
+    if (unitF    && r.unit          !== unitF)    return false;
+    if (areaF    && r.area          !== areaF)    return false;
+    if (typeF    && r.equipmentType !== typeF)    return false;
+    if (periodeF && r.periode       !== periodeF) return false;
+    return true;
+  });
+
+  if (!filtered.length) { toast('Tidak ada laporan untuk dicetak (cek filter)','warning'); return; }
+
+  filtered = filtered.slice().sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const sigs = getLocalSigs();
+  const printDate = new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
+
+  const pages = filtered.map((r, i) => {
+    const sig = sigs[r.id] || null;
+    const breakStyle = i < filtered.length - 1 ? 'page-break-after:always;' : '';
+    return `<div style="${breakStyle}">${buildPMBodyContent(JSON.parse(JSON.stringify(r)), sig)}</div>`;
+  }).join('\n');
+
+  const fullHTML = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+<title>Semua Laporan PM — ${printDate}</title>
+<style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A4 portrait;margin:12mm 14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;background:#fff}table{width:100%;border-collapse:collapse}.il{background:#eef3ee;padding:5px 10px;font-weight:600;font-size:8.5pt;width:110px;color:#1a3a6b;border:1px solid #ccc}.iv{padding:5px 10px;font-size:9pt;border:1px solid #ccc}.st{background:#1a3a6b;color:#fff;padding:6px 12px;font-size:9pt;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px}.th{background:#1a3a6b;color:rgba(255,255,255,.85);padding:6px 8px;font-size:8pt;letter-spacing:.04em;text-transform:uppercase;border:1px solid #2a4a7b}.sc{padding:10px 12px;border:1px solid #ccc;text-align:center;width:33.3%}.ft{margin-top:8px;padding:4px 0;font-size:7.5pt;color:#999;border-top:1px solid #eee;text-align:center}
+@media print{.no-print{display:none !important}}
+</style>
+</head><body>
+<div class="no-print" style="padding:10px;background:#f4f7f4;border-bottom:2px solid #1a3a6b;display:flex;align-items:center;gap:12px;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">🖨 PRINT / SAVE AS PDF (${filtered.length} dokumen)</button>
+  <span style="font-size:11px;color:#666">💡 Setiap laporan otomatis dimulai di halaman baru</span>
+  <button onclick="window.close()" style="margin-left:auto;background:none;border:1px solid #ccc;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px">✕ Tutup</button>
+</div>
+${pages}
+</body></html>`;
+
+  const w = window.open('','_blank');
+  w.document.write(fullHTML);
+  w.document.close();
+  toast(`🖨 Menyiapkan ${filtered.length} dokumen PM untuk print sekaligus...`, 'success');
+  setTimeout(()=>{ w.focus(); w.print(); }, 600);
 }
 
 function renderReportPage() {
