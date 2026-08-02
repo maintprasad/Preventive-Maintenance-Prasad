@@ -5975,6 +5975,51 @@ function openDownloadPDFModal() {
   openOverlay('downloadPdfChoiceOverlay');
 }
 
+// Mapping nama penandatangan approval berdasarkan Unit.
+// Deteksi otomatis dari nama unit (mengandung "1" atau "2").
+function _getApprovalNames(unitName) {
+  const u = (unitName || '').toLowerCase();
+  const isUnit2 = u.includes('2');
+  return {
+    unitLabel: isUnit2 ? 'Unit - 2' : 'Unit - 1',
+    disusun:   'Iwan Prasetyo',
+    diperiksa: 'Irawan Krisna Hadi',
+    disetujui: isUnit2 ? 'Wida Laksono' : 'Willy Triyono'
+  };
+}
+
+// Halaman approval — selalu tampil di depan sebelum tabel schedule per unit.
+function _buildApprovalPageHTML(unitName, isPlanningOnly) {
+  const info = _getApprovalNames(unitName);
+  const modeLabel = isPlanningOnly ? 'Planning Schedule' : 'Plan vs Actual';
+  const curYear = new Date().getFullYear();
+  return `<div style="page-break-after:always;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:600px;padding:30px 40px">
+    <div style="text-align:center;margin-bottom:50px">
+      <div style="font-size:11pt;font-weight:700;color:#1a3a6b;letter-spacing:.06em">PT PRASAD SEEDS INDONESIA</div>
+      <div style="font-size:9pt;color:#888;margin-top:2px">Departemen Maintenance</div>
+      <div style="font-size:20pt;font-weight:900;color:#1a3a6b;margin-top:26px;line-height:1.3">Schedule Preventive Maintenance<br>${info.unitLabel}</div>
+      <div style="display:inline-block;margin-top:10px;padding:5px 18px;background:#c0392b;color:#fff;font-size:12pt;font-weight:800;letter-spacing:.1em;border-radius:3px">FOR APPROVAL</div>
+      <div style="font-size:9pt;color:#888;margin-top:10px">${modeLabel} — Tahun ${curYear}</div>
+    </div>
+    <table style="width:100%;max-width:640px;border-collapse:collapse">
+      <tr>
+        <td style="width:33.34%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top">
+          <div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:64px">Disusun Oleh</div>
+          <div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700">${info.disusun}</div>
+        </td>
+        <td style="width:33.33%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top">
+          <div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:64px">Diperiksa Oleh</div>
+          <div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700">${info.diperiksa}</div>
+        </td>
+        <td style="width:33.33%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top">
+          <div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:64px">Disetujui Oleh</div>
+          <div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700">${info.disetujui}</div>
+        </td>
+      </tr>
+    </table>
+  </div>`;
+}
+
 // mode: 'planning' → hanya tampilkan Plan (P)
 //       'both'     → tampilkan Plan vs Actual (P, A, P+A) — perilaku lama/default
 function downloadSchedulePDF(mode = 'both') {
@@ -6124,73 +6169,98 @@ function downloadSchedulePDF(mode = 'both') {
       return (a.equipment||'').localeCompare(b.equipment||'');
     });
 
-    // Data rows
+    // Kelompokkan per Area — supaya ctp-1, ctp-2, peanut, prairie, petkus, dst
+    // TIDAK bercampur jadi satu list panjang, tapi dipisah dengan header per area
+    const areaGroupsPDF = {};
+    items.forEach(s => {
+      const areaKey = s.area || '(Tanpa Area)';
+      if (!areaGroupsPDF[areaKey]) areaGroupsPDF[areaKey] = [];
+      areaGroupsPDF[areaKey].push(s);
+    });
+
+    // Total kolom (No + Machine + Activity + total minggu) untuk colspan header area
+    const totalWeekColsPDF = weeksPerMonth.reduce((a,b)=>a+b, 0);
+    const totalColsPDF = 3 + totalWeekColsPDF;
+
+    // Data rows — dikelompokkan per Area, nomor item di-reset tiap ganti area
     let dataRows = '';
-    items.forEach((s, idx) => {
-      const rowBg = idx % 2 === 0 ? '#fff' : '#f7faf7';
+    Object.entries(areaGroupsPDF).forEach(([areaName, areaItems]) => {
+      dataRows += `<tr><td colspan="${totalColsPDF}" style="background:#dce8dc;color:#1a3a6b;font-weight:800;font-size:8pt;padding:5px 8px;border:1px solid #b8ccb8">📍 ${areaName} <span style="font-weight:400;color:#4a6a4a;font-size:7pt">(${areaItems.length} equipment)</span></td></tr>`;
 
-      // Overdue = ada Plan yang sudah lewat tapi belum ada Actual sama sekali
-      // (pakai fungsi getScheduleStatus yang sudah ada, bukan logika baru)
-      const stStatus    = getScheduleStatus(s); // 'overdue' | 'upcoming' | 'done'
-      const isOverdueRow = stStatus === 'overdue';
-      const nameStyle = isOverdueRow
-        ? 'padding:3px 6px;border:1px solid #ddd;font-size:7.5pt;color:#c0392b;font-weight:700'
-        : 'padding:3px 6px;border:1px solid #ddd;font-size:7.5pt';
-      const overdueTag = isOverdueRow
-        ? ' <span style="font-size:6pt;color:#c0392b;font-weight:700;white-space:nowrap">⚠ OVERDUE</span>'
-        : '';
+      areaItems.forEach((s, idx) => {
+        const rowBg = idx % 2 === 0 ? '#fff' : '#f7faf7';
 
-      let row = `<tr style="background:${rowBg}">`;
-      row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;color:#555">${idx+1}</td>`;
-      row += `<td style="${nameStyle}">${s.equipment||'—'}${overdueTag}</td>`;
-      row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;font-weight:700">A</td>`;
+        // Overdue = ada Plan yang sudah lewat tapi belum ada Actual sama sekali
+        // (pakai fungsi getScheduleStatus yang sudah ada, bukan logika baru)
+        // Mode Planning Only (approval schedule) — jangan tandai overdue,
+        // equipment ditampilkan polos apa adanya untuk keperluan approval.
+        const stStatus    = getScheduleStatus(s); // 'overdue' | 'upcoming' | 'done'
+        const isOverdueRow = !isPlanningOnly && stStatus === 'overdue';
+        const nameStyle = isOverdueRow
+          ? 'padding:3px 6px;border:1px solid #ddd;font-size:7.5pt;color:#c0392b;font-weight:700'
+          : 'padding:3px 6px;border:1px solid #ddd;font-size:7.5pt';
+        const overdueTag = isOverdueRow
+          ? ' <span style="font-size:6pt;color:#c0392b;font-weight:700;white-space:nowrap">⚠ OVERDUE</span>'
+          : '';
 
-      for (let m = 0; m < 12; m++) {
-        for (let w = 1; w <= weeksPerMonth[m]; w++) {
-          const isPlan   = hasPlan(s, m+1, w);
-          const isActual = isPlanningOnly ? false : hasActual(s, m+1, w);
+        let row = `<tr style="background:${rowBg}">`;
+        row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;color:#555">${idx+1}</td>`;
+        row += `<td style="${nameStyle}">${s.equipment||'—'}${overdueTag}</td>`;
+        row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;font-weight:700">A</td>`;
 
-          let cellContent = '';
-          let cellStyle   = 'text-align:center;border:1px solid #ddd;font-size:7pt;font-weight:700;';
+        for (let m = 0; m < 12; m++) {
+          for (let w = 1; w <= weeksPerMonth[m]; w++) {
+            const isPlan   = hasPlan(s, m+1, w);
+            const isActual = isPlanningOnly ? false : hasActual(s, m+1, w);
 
-          if (isPlan && isActual) {
-            cellContent = 'P+A';
-            cellStyle  += 'background:#2e7d32;color:#fff;';
-          } else if (isPlan) {
-            cellContent = 'P';
-            cellStyle  += 'background:#f9c800;color:#000;';
-          } else if (isActual) {
-            cellContent = 'A';
-            cellStyle  += 'background:#4a9e3f;color:#fff;';
-          } else {
-            cellStyle  += 'background:#fff;color:#ddd;';
+            let cellContent = '';
+            let cellStyle   = 'text-align:center;border:1px solid #ddd;font-size:7pt;font-weight:700;';
+
+            if (isPlan && isActual) {
+              cellContent = 'P+A';
+              cellStyle  += 'background:#2e7d32;color:#fff;';
+            } else if (isPlan) {
+              cellContent = 'P';
+              cellStyle  += 'background:#f9c800;color:#000;';
+            } else if (isActual) {
+              cellContent = 'A';
+              cellStyle  += 'background:#4a9e3f;color:#fff;';
+            } else {
+              cellStyle  += 'background:#fff;color:#ddd;';
+            }
+
+            row += `<td style="${cellStyle}">${cellContent}</td>`;
           }
-
-          row += `<td style="${cellStyle}">${cellContent}</td>`;
         }
-      }
-      row += '</tr>';
-      dataRows += row;
+        row += '</tr>';
+        dataRows += row;
+      });
     });
 
     // Count row
-    const countRow = buildCountRow(items);
+    const countRow = buildCountRow(items);  
 
-    // Summary for signature
+    // Approval page — selalu tampil di depan sebelum tabel schedule unit ini
+    allTablesHTML += _buildApprovalPageHTML(unitName, isPlanningOnly);
+
+    // Tabel schedule unit — TANPA overflow-x:auto (penyebab tabel terpotong saat print),
+    // thead dipisah agar header bulan/minggu bisa berulang tiap halaman baru.
     allTablesHTML += `
-      <div style="margin-bottom:24px;page-break-inside:avoid">
+      <div style="page-break-before:always;margin-bottom:24px">
         <div style="background:#1a3a6b;color:#fff;padding:6px 10px;font-size:9pt;font-weight:700;border-radius:3px 3px 0 0;display:flex;align-items:center;justify-content:space-between">
           <span>🏭 ${unitName}</span>
           <span style="font-size:8pt;font-weight:400;color:rgba(255,255,255,.7)">${items.length} equipment</span>
         </div>
-        <div style="overflow-x:auto">
-          <table style="border-collapse:collapse;width:100%;min-width:900px">
+        <table style="border-collapse:collapse;width:100%">
+          <thead>
             ${monthHeaderRow}
             ${weekHeaderRow}
+          </thead>
+          <tbody>
             ${dataRows}
             ${countRow}
-          </table>
-        </div>
+          </tbody>
+        </table>
       </div>`;
   });
 
@@ -6208,25 +6278,8 @@ function downloadSchedulePDF(mode = 'both') {
       <span><span style="display:inline-block;width:18px;height:14px;background:#2e7d32;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>P+A = Plan & Actual (sama minggu)</span>
     </div>`;
 
-  // Signature block
-  const sigHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin-top:20px;border:1px solid #ccc">
-      <div style="padding:10px 14px;text-align:center;border-right:1px solid #ccc">
-        <div style="font-size:8pt;font-weight:700;margin-bottom:4px">Diajukan</div>
-        <div style="height:60px;border-bottom:1px solid #bbb;margin:0 12px"></div>
-        <div style="font-size:8pt;font-weight:600;margin-top:6px">SPV Maintenance</div>
-      </div>
-      <div style="padding:10px 14px;text-align:center;border-right:1px solid #ccc">
-        <div style="font-size:8pt;font-weight:700;margin-bottom:4px">Disetujui</div>
-        <div style="height:60px;border-bottom:1px solid #bbb;margin:0 12px"></div>
-        <div style="font-size:8pt;font-weight:600;margin-top:6px">Plan Manager</div>
-      </div>
-      <div style="padding:10px 14px;text-align:center">
-        <div style="font-size:8pt;font-weight:700;margin-bottom:4px">Mengetahui</div>
-        <div style="height:60px;border-bottom:1px solid #bbb;margin:0 12px"></div>
-        <div style="font-size:8pt;font-weight:600;margin-top:6px">Mgr Maintenance</div>
-      </div>
-    </div>`;
+  // Signature block dihapus — sudah digantikan oleh approval page (cover) per unit
+  // yang berisi Disusun Oleh / Diperiksa Oleh / Disetujui Oleh.
 
   // Build label filter aktif untuk judul PDF
   const filterParts = [];
@@ -6244,7 +6297,10 @@ function downloadSchedulePDF(mode = 'both') {
 *{box-sizing:border-box;margin:0;padding:0}
 @page{size:A3 landscape;margin:8mm 10mm}
 body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#111;background:#fff}
-table{border-collapse:collapse}
+table{border-collapse:collapse;width:100%}
+tr{page-break-inside:avoid;break-inside:avoid}
+thead{display:table-header-group}
+img{max-width:100%}
 @media print{
   body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .no-print{display:none}
@@ -6273,7 +6329,6 @@ table{border-collapse:collapse}
 
 ${legendHTML}
 ${allTablesHTML}
-${sigHTML}
 
 <div style="margin-top:10px;padding:4px 0;font-size:7pt;color:#aaa;border-top:1px solid #eee;text-align:center">
   PM Plan ${curYear} — PT Prasad Seeds Indonesia | Dicetak: ${printDate} | Total Equipment: ${filtered.length}
