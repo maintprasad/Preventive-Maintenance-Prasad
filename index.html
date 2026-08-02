@@ -6,6 +6,7 @@
 <title>Prasad Seeds — Preventive Maintenance</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Sacramento&family=Alex+Brush&family=Pacifico&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <style>
 :root{
   --bg:#f4f7f4;--bg2:#ffffff;--bg3:#eef3ee;--border:#d4e0d4;
@@ -850,6 +851,8 @@ button,select,input{touch-action:manipulation}
       <button class="btn-ghost" onclick="schCollapseAll()">⊟ Collapse All</button>
       <button class="btn-ghost" onclick="showPage('schedule-calendar')">📆 Calendar</button>
       <button class="btn-blue" onclick="downloadSchedulePDF()">📥 Download PDF</button>
+      <button class="btn-orange" onclick="downloadCompletionReportPDF()">📊 Report Ketercapaian (PDF)</button>
+      <button class="btn-ghost" style="border-color:rgba(74,158,63,.5);color:var(--green2)" onclick="exportCompletionReportExcel()">📗 Report Ketercapaian (Excel)</button>
       <button class="btn-primary" onclick="openScheduleModal()">+ TAMBAH</button>
     </div>
   </div>
@@ -2174,7 +2177,33 @@ function getNextDue(s) {
   const days = PERIODE_DAYS[s.periode] || 30;
   return new Date(new Date(s.lastDone).getTime() + days * 86400000);
 }
+// Klasifikasi waktu penyelesaian PM terhadap target planning-nya.
+// TIDAK dipakai untuk Completion % — hanya untuk info tambahan (early/on time/late).
+function getPMTimingStatus(s) {
+  if (!hasReport(s)) return 'outstanding';
 
+  const reports = getData(STORE.REPORTS);
+  const tag  = (s.tagNo||'').trim().toLowerCase();
+  const name = (s.equipment||'').trim().toLowerCase();
+  const unit = (s.unit||'').trim().toLowerCase();
+
+  // Ambil laporan yang cocok dengan schedule ini, urutkan dari terbaru
+  const matched = reports.filter(r => {
+    if (tag && r.tagNo && r.tagNo.trim().toLowerCase() === tag) return true;
+    return (r.equipmentName||'').trim().toLowerCase() === name
+        && (r.unit||'').trim().toLowerCase() === unit;
+  }).sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  const latest = matched[0];
+  if (!latest || !latest.date) return 'outstanding';
+
+  const actualDate  = new Date(latest.date); actualDate.setHours(0,0,0,0);
+  const targetDate  = getNextDue(s); targetDate.setHours(0,0,0,0);
+
+  if (actualDate.getTime() < targetDate.getTime()) return 'early';
+  if (actualDate.getTime() > targetDate.getTime()) return 'late';
+  return 'on_time';
+}
 // ════════════════════════════════════════════════════════
 //  DASHBOARD
 // ════════════════════════════════════════════════════════
@@ -2324,7 +2353,8 @@ function renderDashboard() {
   const fYear  = parseInt(document.getElementById('dash-filter-year')?.value)  || 0;
   const fMonth = parseInt(document.getElementById('dash-filter-month')?.value) || 0;
 
-  // Filter laporan sesuai bulan/tahun
+  // filteredReports TETAP dipakai untuk chart yang memang berbasis tanggal laporan
+  // (trend bulanan & breakdown equipment type) — BUKAN untuk hitung Completion.
   const filteredReports = reports.filter(r => {
     if (!r.date) return false;
     const d = new Date(r.date);
@@ -2333,13 +2363,24 @@ function renderDashboard() {
     return true;
   });
 
+  // ── PLAN = jadwal berdasarkan BULAN PLANNING (s.month), bukan tanggal report ──
+  // Catatan: schedule tidak menyimpan tahun eksplisit, jadi filter tahun
+  // hanya berlaku sebagai konteks tampilan, bukan filter Plan.
+  const scheduleInPeriod = schedules.filter(s => {
+    if (fMonth && (parseInt(s.month) || 0) !== fMonth) return false;
+    return true;
+  });
+
+  // "Closed" = pernah ada laporan untuk equipment ini, TANPA memandang tanggal report
+  function isClosed(s) { return hasReport(s); }
+
   // ── KPI Bar ──
   const units = [...new Set(schedules.map(s=>s.unit||'').filter(Boolean))].sort();
   let totalPlan = 0, totalActual = 0;
   units.forEach(u => {
-    const sch = schedules.filter(s=>s.unit===u);
+    const sch = scheduleInPeriod.filter(s=>s.unit===u);
     totalPlan += sch.length;
-    totalActual += sch.filter(s=>hasReport(s, filteredReports)).length;
+    totalActual += sch.filter(s=>isClosed(s)).length;
   });
   const pct = totalPlan ? Math.round(totalActual/totalPlan*100) : 0;
   const pctColor = pct===100?'var(--green)':pct>=60?'var(--orange)':'var(--red)';
@@ -2374,13 +2415,13 @@ function renderDashboard() {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 
-    const sch = schedules.filter(s=>s.unit===unitName);
+    const sch = scheduleInPeriod.filter(s=>s.unit===unitName);
     const areas = [...new Set(sch.map(s=>s.area||'(Tanpa Area)'))].sort();
 
     const planData   = areas.map(a => sch.filter(s=>(s.area||'(Tanpa Area)')===a).length);
     const actualData = areas.map(a => {
       const areaSchedules = sch.filter(s=>(s.area||'(Tanpa Area)')===a);
-      return areaSchedules.filter(s=>hasReport(s, filteredReports)).length;
+      return areaSchedules.filter(s=>isClosed(s)).length;
     });
 
     charts[canvasId] = new Chart(canvas, {
@@ -2438,13 +2479,13 @@ function renderDashboard() {
 
   let tableHTML = '';
   units.forEach(unitName => {
-    const sch   = schedules.filter(s=>s.unit===unitName);
+    const sch   = scheduleInPeriod.filter(s=>s.unit===unitName);
     const areas = [...new Set(sch.map(s=>s.area||'(Tanpa Area)'))].sort();
 
     const rows = areas.map((area,i) => {
       const areaSchedules = sch.filter(s=>(s.area||'(Tanpa Area)')===area);
       const plan   = areaSchedules.length;
-      const actual = areaSchedules.filter(s=>hasReport(s, filteredReports)).length;
+      const actual = areaSchedules.filter(s=>isClosed(s)).length;
       const p      = plan ? Math.round(actual/plan*100) : 0;
       const pColor = p===100?'var(--green)':p>=60?'var(--orange)':'var(--red)';
       return `<tr style="background:${i%2===0?'var(--bg3)':'var(--bg2)'}">
@@ -2462,7 +2503,7 @@ function renderDashboard() {
     }).join('');
 
     const unitPlan   = sch.length;
-    const unitActual = sch.filter(s=>hasReport(s, filteredReports)).length;
+    const unitActual = sch.filter(s=>isClosed(s)).length;
     const unitPct    = unitPlan ? Math.round(unitActual/unitPlan*100) : 0;
     const unitColor  = unitPct===100?'var(--green)':unitPct>=60?'var(--orange)':'var(--red)';
 
@@ -6078,9 +6119,21 @@ function downloadSchedulePDF() {
     let dataRows = '';
     items.forEach((s, idx) => {
       const rowBg = idx % 2 === 0 ? '#fff' : '#f7faf7';
+
+      // Overdue = ada Plan yang sudah lewat tapi belum ada Actual sama sekali
+      // (pakai fungsi getScheduleStatus yang sudah ada, bukan logika baru)
+      const stStatus    = getScheduleStatus(s); // 'overdue' | 'upcoming' | 'done'
+      const isOverdueRow = stStatus === 'overdue';
+      const nameStyle = isOverdueRow
+        ? 'padding:3px 6px;border:1px solid #ddd;font-size:7.5pt;color:#c0392b;font-weight:700'
+        : 'padding:3px 6px;border:1px solid #ddd;font-size:7.5pt';
+      const overdueTag = isOverdueRow
+        ? ' <span style="font-size:6pt;color:#c0392b;font-weight:700;white-space:nowrap">⚠ OVERDUE</span>'
+        : '';
+
       let row = `<tr style="background:${rowBg}">`;
       row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;color:#555">${idx+1}</td>`;
-      row += `<td style="padding:3px 6px;border:1px solid #ddd;font-size:7.5pt">${s.equipment||'—'}</td>`;
+      row += `<td style="${nameStyle}">${s.equipment||'—'}${overdueTag}</td>`;
       row += `<td style="text-align:center;border:1px solid #ddd;font-size:7.5pt;font-weight:700">A</td>`;
 
       for (let m = 0; m < 12; m++) {
@@ -6139,6 +6192,7 @@ function downloadSchedulePDF() {
       <span><span style="display:inline-block;width:18px;height:14px;background:#f9c800;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>P = Plan (Terjadwal)</span>
       <span><span style="display:inline-block;width:18px;height:14px;background:#4a9e3f;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>A = Actual (Laporan Masuk)</span>
       <span><span style="display:inline-block;width:18px;height:14px;background:#2e7d32;border:1px solid #ccc;vertical-align:middle;margin-right:3px"></span>P+A = Plan & Actual (sama minggu)</span>
+      <span><span style="color:#c0392b;font-weight:700;margin-right:3px">Nama Equipment</span>= Overdue (Plan sudah lewat, belum ada Actual)</span>
     </div>`;
 
   // Signature block
@@ -6216,6 +6270,555 @@ ${sigHTML}
   w.document.write(fullHTML);
   w.document.close();
   setTimeout(() => { w.focus(); }, 300);
+}
+
+// ════════════════════════════════════════════════════════
+//  REPORT KETERCAPAIAN PM PER UNIT — helper perhitungan bersama
+//  (dipakai oleh versi PDF & versi Excel supaya angkanya selalu sama)
+// ════════════════════════════════════════════════════════
+// Kategori status bulanan — memperhitungkan apakah bulan tsb SUDAH LEWAT/BERJALAN
+// atau MASIH DI MASA DEPAN, supaya bulan yang belum dijalani tidak dicap "Kritis".
+//   'no-plan' → tidak ada PM dijadwalkan bulan itu
+//   'ahead'   → bulan masih di depan, TAPI semua PM sudah Closed (selesai lebih awal)
+//   'not-due' → bulan masih di depan, belum waktunya dievaluasi
+//   'good' / 'warning' / 'critical' → bulan sudah berjalan/lewat, dinilai dari %
+function _monthCategory(total, pct, isFuture) {
+  if (total === 0) return 'no-plan';
+  if (isFuture) return (pct === 100) ? 'ahead' : 'not-due';
+  if (pct >= 80) return 'good';
+  if (pct >= 50) return 'warning';
+  return 'critical';
+}
+
+const _CAT_STYLE = {
+  'no-plan':  { color:'#bbb',    bg:'#fafafa', label:'Tidak Ada Jadwal' },
+  'ahead':    { color:'#7c3aed', bg:'#f3e8fd', label:'Selesai Lebih Awal' },
+  'not-due':  { color:'#2b6cb8', bg:'#e3eefc', label:'Belum Waktunya' },
+  'good':     { color:'#2e7d32', bg:'#e8f5e8', label:'Tercapai Baik' },
+  'warning':  { color:'#c97a00', bg:'#fff4e0', label:'Perlu Perhatian' },
+  'critical': { color:'#b03020', bg:'#fdecea', label:'Kritis — Tertinggal' },
+};
+
+// Dipertahankan untuk kompatibilitas kode lama (mis. card unit tahunan yang
+// tidak punya konsep "future") — tetap pakai skala normal.
+function _pctColor(pct) {
+  if (pct === null) return _CAT_STYLE['no-plan'].color;
+  if (pct >= 80) return _CAT_STYLE['good'].color;
+  if (pct >= 50) return _CAT_STYLE['warning'].color;
+  return _CAT_STYLE['critical'].color;
+}
+function _pctBg(pct) {
+  if (pct === null) return _CAT_STYLE['no-plan'].bg;
+  if (pct >= 80) return _CAT_STYLE['good'].bg;
+  if (pct >= 50) return _CAT_STYLE['warning'].bg;
+  return _CAT_STYLE['critical'].bg;
+}
+function _pctLabel(pct) {
+  if (pct === null) return _CAT_STYLE['no-plan'].label;
+  if (pct >= 80) return _CAT_STYLE['good'].label;
+  if (pct >= 50) return _CAT_STYLE['warning'].label;
+  return _CAT_STYLE['critical'].label;
+}
+
+// Breakdown detail: Unit → Area → daftar equipment (mana yang sudah, mana yang belum)
+// Status "Closed" pakai hasReport(s) — sama seperti perhitungan Completion di dashboard.
+function _buildUnitAreaBreakdownHTML(unitFilter) {
+  const schedules = getData(STORE.SCHEDULES);
+  const scope = unitFilter ? schedules.filter(s => s.unit === unitFilter) : schedules;
+  if (!scope.length) return '';
+
+  const units = [...new Set(scope.map(s => s.unit || '(Tanpa Unit)'))].sort();
+  let html = '';
+
+  units.forEach((unit, uIdx) => {
+    const unitSchedules = scope.filter(s => (s.unit || '(Tanpa Unit)') === unit);
+    const areas = [...new Set(unitSchedules.map(s => s.area || '(Tanpa Area)'))].sort();
+    const unitClosed = unitSchedules.filter(s => hasReport(s)).length;
+    const unitPct = unitSchedules.length ? Math.round(unitClosed / unitSchedules.length * 100) : 0;
+
+    if (uIdx > 0) html += `<div style="page-break-before:always"></div>`;
+
+    html += `<div class="section-title">🏭 Detail per Area — ${unit}
+      <span style="float:right;font-size:8pt;font-weight:700;color:${_pctColor(unitPct)}">${unitClosed}/${unitSchedules.length} PM Selesai (${unitPct}%)</span>
+    </div>`;
+
+    areas.forEach(area => {
+      const items = unitSchedules.filter(s => (s.area || '(Tanpa Area)') === area);
+      const closedCount = items.filter(s => hasReport(s)).length;
+      const pct = items.length ? Math.round(closedCount / items.length * 100) : 0;
+
+      // urutkan: yang belum PM ditaruh di atas biar langsung kelihatan
+      const sorted = [...items].sort((a,b) => (hasReport(a)?1:0) - (hasReport(b)?1:0));
+
+      const rows = sorted.map((s, i) => {
+        const closed = hasReport(s);
+        const statusLabel = closed ? '✅ Sudah PM' : '⏳ Belum PM';
+        const statusColor = closed ? '#2e7d32' : '#b03020';
+        const statusBg = closed ? '#e8f5e8' : '#fdecea';
+        return `<tr style="background:${i % 2 === 0 ? '#fff' : '#f9fbf9'}">
+          <td style="text-align:left;border:1px solid #eee;font-size:7.5pt;color:#888;padding:3px 6px">${i+1}</td>
+          <td style="border:1px solid #eee;font-size:8pt;padding:3px 6px;${closed?'':'font-weight:700;color:#b03020'}">${s.equipment || '—'}</td>
+          <td style="border:1px solid #eee;font-size:7.5pt;padding:3px 6px;color:#666">${s.tagNo || '—'}</td>
+          <td style="text-align:center;border:1px solid #eee;font-size:7.5pt;padding:3px 6px">${MONTHS_ID[(parseInt(s.month)||1)-1]}</td>
+          <td style="text-align:center;border:1px solid #eee;padding:3px 6px">
+            <span style="font-size:7.5pt;font-weight:700;color:${statusColor};background:${statusBg};padding:2px 9px;border-radius:10px;white-space:nowrap">${statusLabel}</span>
+          </td>
+        </tr>`;
+      }).join('');
+
+      html += `<div style="margin-bottom:12px;border:1px solid #ddd;border-radius:6px;overflow:hidden;page-break-inside:avoid">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:${_pctBg(pct)};border-bottom:1px solid #ddd">
+          <div style="font-weight:700;font-size:9pt;color:#1a3a6b">📍 ${area}</div>
+          <div style="font-size:8.5pt;font-weight:800;color:${_pctColor(pct)}">${pct}% &nbsp;(${closedCount}/${items.length} selesai)</div>
+        </div>
+        <table style="margin-bottom:0">
+          <thead><tr>
+            <th style="text-align:left;width:32px;background:#eef3ee;color:#1a3a6b;font-size:7pt;padding:4px 6px">No</th>
+            <th style="text-align:left;background:#eef3ee;color:#1a3a6b;font-size:7pt;padding:4px 6px">Equipment</th>
+            <th style="text-align:left;width:85px;background:#eef3ee;color:#1a3a6b;font-size:7pt;padding:4px 6px">Tag No</th>
+            <th style="text-align:center;width:80px;background:#eef3ee;color:#1a3a6b;font-size:7pt;padding:4px 6px">Bulan Plan</th>
+            <th style="text-align:center;width:95px;background:#eef3ee;color:#1a3a6b;font-size:7pt;padding:4px 6px">Status</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    });
+  });
+
+  return html;
+}
+
+// Plan = jumlah schedule dengan bulan planning = m (s.month)
+// Completed = dari jumlah Plan itu, berapa yang statusnya sudah ada report (Closed),
+//             TANPA memandang tanggal laporan.
+function _computeCompletionStats(unitFilter) {
+  const schedules = getData(STORE.SCHEDULES);
+  const scope = unitFilter ? schedules.filter(s => s.unit === unitFilter) : schedules;
+  const units = [...new Set(scope.map(s => s.unit || '(Tanpa Unit)'))].sort();
+
+  // Bulan sekarang jadi patokan: bulan > bulan sekarang dianggap "belum dijalani"
+  const curMonth = new Date().getMonth() + 1;
+
+  const statsByUnit = {};
+  let grandPlan = 0, grandDone = 0;
+
+  units.forEach(unit => {
+    const monthly = [];
+    let planYear = 0, doneYear = 0;
+    for (let m = 1; m <= 12; m++) {
+      const plan = scope.filter(s => (s.unit || '(Tanpa Unit)') === unit && (parseInt(s.month) || 0) === m);
+      const done = plan.filter(s => hasReport(s));
+      const total = plan.length;
+      const completed = done.length;
+      const pct = total ? Math.round(completed / total * 100) : null;
+      const isFuture = m > curMonth;
+      const category = _monthCategory(total, pct, isFuture);
+      monthly.push({ total, completed, pct, isFuture, category });
+      planYear += total; doneYear += completed;
+    }
+    const yearPct = planYear ? Math.round(doneYear / planYear * 100) : null;
+    statsByUnit[unit] = { monthly, planYear, doneYear, yearPct };
+    grandPlan += planYear; grandDone += doneYear;
+  });
+
+  const grandPct = grandPlan ? Math.round(grandDone / grandPlan * 100) : 0;
+  return { units, statsByUnit, grandPlan, grandDone, grandPct, curMonth };
+}
+
+// Render grafik tren completion per unit sebagai gambar (dipakai di PDF)
+function _buildCompletionChartImage(units, statsByUnit) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1100; canvas.height = 440;
+    canvas.style.position = 'fixed';
+    canvas.style.left = '-9999px';
+    document.body.appendChild(canvas);
+
+    const colors = ['#2b6cb8','#4a9e3f','#e67e22','#7c3aed','#c0392b','#2a7a5a'];
+    const datasets = units.map((u, i) => ({
+      label: u,
+      data: statsByUnit[u].monthly.map(m => m.pct),
+      borderColor: colors[i % colors.length],
+      backgroundColor: colors[i % colors.length],
+      spanGaps: true,
+      tension: 0.3,
+      pointRadius: 4,
+      pointHoverRadius: 5,
+      borderWidth: 2.5
+    }));
+
+    const chart = new Chart(canvas, {
+      type: 'line',
+      data: { labels: MONTHS_ID.map(m => m.slice(0,3)), datasets },
+      options: {
+        responsive: false,
+        animation: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font:{size:13}, color:'#333', padding:14 } },
+          title: { display:true, text:'Tren % Ketercapaian PM per Unit — Sepanjang Tahun', font:{size:16,weight:'bold'}, color:'#1a3a6b', padding:{bottom:14} }
+        },
+        scales: {
+          y: { min:0, max:100, ticks:{ callback:v=>v+'%', font:{size:11} }, grid:{color:'#eee'}, title:{display:true,text:'% Ketercapaian'} },
+          x: { grid:{display:false}, ticks:{font:{size:11}} }
+        }
+      }
+    });
+
+    setTimeout(() => {
+      const img = canvas.toDataURL('image/png', 1.0);
+      chart.destroy();
+      canvas.remove();
+      resolve(img);
+    }, 350);
+  });
+}
+
+async function downloadCompletionReportPDF() {
+  const schedules = getData(STORE.SCHEDULES);
+  if (!schedules.length) { toast('Belum ada schedule PM', 'warning'); return; }
+
+  const unitF = document.getElementById('sch-filter-unit')?.value || '';
+  const { units, statsByUnit, grandPlan, grandDone, grandPct } = _computeCompletionStats(unitF);
+  if (!units.length) { toast('Tidak ada data untuk filter unit ini', 'warning'); return; }
+
+  toast('📊 Menyiapkan grafik & laporan...', 'info');
+  const chartImg = await _buildCompletionChartImage(units, statsByUnit);
+
+  const printDate = new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
+  const curYear = new Date().getFullYear();
+
+  // ── Card per unit — kata-kata jelas, bukan cuma angka mentah ──
+  const unitCardsHTML = units.map(u => {
+    const st = statsByUnit[u];
+    const pct = st.yearPct;
+    return `<div style="border:1px solid #ccc;border-left:5px solid ${_pctColor(pct)};border-radius:6px;padding:12px 16px;background:#fff">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:10.5pt;font-weight:800;color:#1a3a6b">🏭 ${u}</div>
+        <div style="font-size:7.5pt;font-weight:700;padding:2px 8px;border-radius:10px;background:${_pctBg(pct)};color:${_pctColor(pct)}">${_pctLabel(pct)}</div>
+      </div>
+      <div style="font-size:24pt;font-weight:900;color:${_pctColor(pct)};line-height:1">${pct===null?'—':pct+'%'}</div>
+      <div style="font-size:8pt;color:#666;margin-top:4px">
+        ✅ <strong>${st.doneYear}</strong> dari <strong>${st.planYear}</strong> jadwal PM sudah selesai (Closed)
+      </div>
+      <div style="font-size:8pt;color:${st.planYear-st.doneYear>0?'#b03020':'#888'};margin-top:2px">
+        ${st.planYear-st.doneYear>0 ? `⚠ ${st.planYear-st.doneYear} PM masih Outstanding (belum dikerjakan)` : '🎉 Semua PM sudah selesai'}
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── Header tabel bulan ──
+  let headerRow = '<tr><th style="text-align:left;min-width:160px">Unit</th>';
+  MONTHS_ID.forEach(m => { headerRow += `<th style="text-align:center;min-width:56px">${m.slice(0,3)}</th>`; });
+  headerRow += '<th style="text-align:center;min-width:75px;background:#132c52">Rata-rata<br>Setahun</th></tr>';
+
+  // ── Baris per unit ──
+  let bodyRows = '';
+  units.forEach((unit, idx) => {
+    const rowBg = idx % 2 === 0 ? '#fff' : '#f7faf7';
+    const st = statsByUnit[unit];
+    const cells = st.monthly.map(m => {
+      const style = _CAT_STYLE[m.category];
+      if (m.total === 0) {
+        return `<td style="text-align:center;border:1px solid #ddd;background:${style.bg};color:${style.color};font-size:8pt;padding:4px 2px">—</td>`;
+      }
+      const label = (m.category === 'not-due')
+        ? `<span style="font-size:7pt">Belum<br>Waktunya</span>`
+        : `${m.pct}%`;
+      const sub = `<div style="font-size:6pt;color:#888;font-weight:400">${m.completed}/${m.total} PM</div>`;
+      return `<td style="text-align:center;border:1px solid #ddd;background:${style.bg};color:${style.color};font-weight:700;font-size:8pt;padding:4px 2px">${label}${sub}</td>`;
+    }).join('');
+
+    bodyRows += `<tr style="background:${rowBg}">
+      <td style="padding:5px 8px;border:1px solid #ddd;font-weight:700;font-size:8.5pt;color:#1a3a6b">🏭 ${unit}</td>
+      ${cells}
+      <td style="text-align:center;border:1px solid #ddd;background:${_pctBg(st.yearPct)};color:${_pctColor(st.yearPct)};font-weight:800;font-size:9pt">
+        ${st.yearPct === null ? '—' : st.yearPct + '%'}
+        <div style="font-size:6.5pt;color:#888;font-weight:400">${st.doneYear}/${st.planYear} PM</div>
+      </td>
+    </tr>`;
+  });
+
+  const areaBreakdownHTML = _buildUnitAreaBreakdownHTML(unitF);
+
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
+<title>Report Ketercapaian PM — ${curYear}</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+@page{size:A4 landscape;margin:10mm 12mm}
+body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111}
+table{width:100%;border-collapse:collapse;margin-bottom:14px}
+th{background:#1a3a6b;color:#fff;padding:6px 4px;font-size:7.5pt;letter-spacing:.03em}
+.hdr-bar{background:#1a3a6b;color:#fff;padding:10px 14px;border-radius:4px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.kpi{border:1px solid #ccc;border-radius:5px;padding:10px 14px;text-align:center}
+.kpi-val{font-size:20pt;font-weight:900;color:#1a3a6b}
+.kpi-lbl{font-size:7.5pt;color:#777;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+.section-title{font-size:9.5pt;font-weight:800;color:#1a3a6b;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #1a3a6b;text-transform:uppercase;letter-spacing:.03em}
+.unit-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:6px}
+.legend-bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:7px 12px;background:#f4f7f4;border:1px solid #ccc;border-radius:4px;font-size:7.5pt}
+.footer{margin-top:10px;padding:5px 0;font-size:7pt;color:#aaa;border-top:1px solid #eee;text-align:center}
+@media print{.no-print{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.unit-card-grid,table{page-break-inside:avoid}}
+</style></head><body>
+
+<div class="no-print" style="padding:10px;background:#f4f7f4;border-bottom:2px solid #1a3a6b;display:flex;align-items:center;gap:12px;margin-bottom:14px">
+  <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">🖨 PRINT / SAVE AS PDF</button>
+  <span style="font-size:11px;color:#666">💡 % dihitung dari Planning Month + Status Closed (bukan tanggal laporan)</span>
+  <button onclick="window.close()" style="margin-left:auto;background:none;border:1px solid #ccc;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px">✕ Tutup</button>
+</div>
+
+<div class="hdr-bar">
+  <div>
+    <div style="font-size:7pt;color:rgba(255,255,255,.6);letter-spacing:.08em">PT PRASAD SEEDS INDONESIA — DEPARTEMEN MAINTENANCE</div>
+    <div style="font-size:13pt;font-weight:900">REPORT KETERCAPAIAN PREVENTIVE MAINTENANCE ${curYear}</div>
+    <div style="font-size:8pt;color:rgba(255,255,255,.75);margin-top:2px">Seberapa banyak jadwal PM yang sudah benar-benar selesai (Closed), per unit per bulan${unitF?' — '+unitF:''}</div>
+  </div>
+  <div style="text-align:right;font-size:7.5pt;color:rgba(255,255,255,.6)">
+    <div>Dicetak: ${printDate}</div>
+    <div style="margin-top:2px">Form: F-MTC-KPI-01 | Rev: 00</div>
+  </div>
+</div>
+
+<div class="section-title">Ringkasan Keseluruhan</div>
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-val">${grandPlan}</div><div class="kpi-lbl">Total PM Dijadwalkan</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:#2e7d32">${grandDone}</div><div class="kpi-lbl">Sudah Selesai (Closed)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${grandPlan-grandDone>0?'#b03020':'#2e7d32'}">${grandPlan-grandDone}</div><div class="kpi-lbl">Belum Selesai (Outstanding)</div></div>
+  <div class="kpi"><div class="kpi-val" style="color:${_pctColor(grandPct)}">${grandPct}%</div><div class="kpi-lbl">Ketercapaian Keseluruhan</div></div>
+</div>
+
+<div class="section-title">Ketercapaian per Unit</div>
+<div class="unit-card-grid">${unitCardsHTML}</div>
+
+<div class="section-title">Grafik Tren Bulanan</div>
+<div style="text-align:center;margin-bottom:10px">
+  <img src="${chartImg}" style="max-width:100%;height:auto;border:1px solid #eee;border-radius:6px">
+</div>
+
+<div class="section-title">Tabel Detail per Bulan</div>
+<div class="legend-bar">
+  <strong>Keterangan warna:</strong>
+  <span><span style="display:inline-block;width:16px;height:12px;background:#e8f5e8;border:1px solid #2e7d32;vertical-align:middle;margin-right:3px"></span>🟩 ≥80% — Tercapai Baik (bulan sudah berjalan/lewat)</span>
+  <span><span style="display:inline-block;width:16px;height:12px;background:#fff4e0;border:1px solid #c97a00;vertical-align:middle;margin-right:3px"></span>🟨 50–79% — Perlu Perhatian</span>
+  <span><span style="display:inline-block;width:16px;height:12px;background:#fdecea;border:1px solid #b03020;vertical-align:middle;margin-right:3px"></span>🟥 &lt;50% — Kritis, Tertinggal</span>
+  <span><span style="display:inline-block;width:16px;height:12px;background:#f3e8fd;border:1px solid #7c3aed;vertical-align:middle;margin-right:3px"></span>🟪 Selesai Lebih Awal — bulan belum tiba tapi semua PM sudah Closed</span>
+  <span><span style="display:inline-block;width:16px;height:12px;background:#e3eefc;border:1px solid #2b6cb8;vertical-align:middle;margin-right:3px"></span>🔵 Belum Waktunya — bulan masih di depan, belum dievaluasi</span>
+  <span><span style="display:inline-block;width:16px;height:12px;background:#fafafa;border:1px solid #bbb;vertical-align:middle;margin-right:3px"></span>⬜ Tidak ada PM dijadwalkan bulan itu</span>
+</div>
+<table>
+  <thead>${headerRow}</thead>
+  <tbody>${bodyRows}</tbody>
+</table>
+
+<div style="font-size:7.5pt;color:#666;margin-bottom:8px">
+  <strong>Cara membaca laporan ini:</strong> Angka % menunjukkan berapa persen PM yang dijadwalkan pada bulan tersebut (Planning Month) yang statusnya sudah <em>Closed</em>. Untuk bulan yang <strong>sudah berjalan atau sudah lewat</strong>, warna merah/kuning/hijau menunjukkan seberapa tercapai target bulan itu. Untuk bulan yang <strong>masih di masa depan</strong>, sistem TIDAK menandainya "Kritis" — melainkan "Belum Waktunya" (biru) jika belum semua selesai, atau "Selesai Lebih Awal" (ungu) jika ternyata semua PM di bulan itu sudah dikerjakan mendahului jadwalnya. Angka kecil di bawah % adalah jumlah PM selesai dibanding total PM yang dijadwalkan (contoh: 46/78 artinya 46 dari 78 PM sudah selesai).
+</div>
+
+<div style="page-break-before:always"></div>
+${areaBreakdownHTML}
+
+<div class="footer">Report Ketercapaian PM — PT Prasad Seeds Indonesia | Tahun ${curYear} | Dicetak: ${printDate}</div>
+</body></html>`;
+
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(() => { w.focus(); w.print(); }, 500);
+}
+
+// ════════════════════════════════════════════════════════
+//  REPORT KETERCAPAIAN PM — EXPORT EXCEL (.xlsx, berwarna)
+// ════════════════════════════════════════════════════════
+async function exportCompletionReportExcel() {
+  if (typeof ExcelJS === 'undefined') { toast('Library Excel belum siap, coba lagi sebentar', 'error'); return; }
+
+  const unitF = document.getElementById('sch-filter-unit')?.value || '';
+  const { units, statsByUnit, grandPlan, grandDone, grandPct } = _computeCompletionStats(unitF);
+  if (!units.length) { toast('Tidak ada data untuk filter unit ini', 'warning'); return; }
+
+  toast('📗 Menyiapkan file Excel...', 'info');
+
+  const curYear = new Date().getFullYear();
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'PM Dashboard — PT Prasad Seeds Indonesia';
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet('Ketercapaian PM ' + curYear, {
+    views: [{ state: 'frozen', ySplit: 6, xSplit: 1 }]
+  });
+
+  const NAVY  = 'FF1A3A6B';
+  const GREEN = 'FF2E7D32';
+  const GREEN_BG = 'FFE8F5E8';
+  const ORANGE = 'FFC97A00';
+  const ORANGE_BG = 'FFFFF4E0';
+  const RED = 'FFB03020';
+  const RED_BG = 'FFFDECEA';
+  const GRAY_BG = 'FFFAFAFA';
+  const WHITE = 'FFFFFFFF';
+
+  const PURPLE = 'FF7C3AED';
+  const PURPLE_BG = 'FFF3E8FD';
+  const BLUE = 'FF2B6CB8';
+  const BLUE_BG = 'FFE3EEFC';
+
+  function fillForCategory(cat) {
+    switch (cat) {
+      case 'good':     return GREEN_BG;
+      case 'warning':  return ORANGE_BG;
+      case 'critical': return RED_BG;
+      case 'ahead':    return PURPLE_BG;
+      case 'not-due':  return BLUE_BG;
+      default:         return GRAY_BG;
+    }
+  }
+  function fontColorForCategory(cat) {
+    switch (cat) {
+      case 'good':     return GREEN;
+      case 'warning':  return ORANGE;
+      case 'critical': return RED;
+      case 'ahead':    return PURPLE;
+      case 'not-due':  return BLUE;
+      default:         return 'FF999999';
+    }
+  }
+  // Dipertahankan untuk sel "Rata-rata Setahun" yang masih pakai skala normal
+  function fillFor(pct) {
+    if (pct === null) return GRAY_BG;
+    if (pct >= 80) return GREEN_BG;
+    if (pct >= 50) return ORANGE_BG;
+    return RED_BG;
+  }
+  function fontColorFor(pct) {
+    if (pct === null) return 'FF999999';
+    if (pct >= 80) return GREEN;
+    if (pct >= 50) return ORANGE;
+    return RED;
+  }
+
+  // ── Judul ──
+  ws.mergeCells('A1:N1');
+  ws.getCell('A1').value = `REPORT KETERCAPAIAN PREVENTIVE MAINTENANCE ${curYear}${unitF ? ' — ' + unitF : ''}`;
+  ws.getCell('A1').font = { size: 14, bold: true, color: { argb: WHITE } };
+  ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+  ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
+  ws.getRow(1).height = 26;
+
+  ws.mergeCells('A2:N2');
+  ws.getCell('A2').value = 'PT Prasad Seeds Indonesia — Departemen Maintenance | % dihitung dari Planning Month + Status Closed (bukan tanggal laporan)';
+  ws.getCell('A2').font = { size: 9, italic: true, color: { argb: 'FF666666' } };
+
+  ws.mergeCells('A3:N3');
+  ws.getCell('A3').value = `Dicetak: ${new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'})}`;
+  ws.getCell('A3').font = { size: 8, color: { argb: 'FF999999' } };
+
+  // ── Ringkasan KPI ──
+  ws.getCell('A5').value = 'Total PM Dijadwalkan';
+  ws.getCell('B5').value = grandPlan;
+  ws.getCell('D5').value = 'Sudah Selesai (Closed)';
+  ws.getCell('E5').value = grandDone;
+  ws.getCell('G5').value = 'Belum Selesai (Outstanding)';
+  ws.getCell('H5').value = grandPlan - grandDone;
+  ws.getCell('J5').value = 'Ketercapaian Keseluruhan';
+  ws.getCell('K5').value = grandPct / 100;
+  ws.getCell('K5').numFmt = '0%';
+  ['A5','D5','G5','J5'].forEach(c => { ws.getCell(c).font = { size: 9, bold: true, color: { argb: 'FF555555' } }; });
+  ['B5','E5','H5','K5'].forEach(c => { ws.getCell(c).font = { size: 12, bold: true, color: { argb: NAVY } }; });
+
+  // ── Header tabel (row 7) ──
+  const headerRowIdx = 7;
+  const headerRow = ws.getRow(headerRowIdx);
+  headerRow.getCell(1).value = 'Unit';
+  MONTHS_ID.forEach((m, i) => { headerRow.getCell(2 + i).value = m; });
+  headerRow.getCell(14).value = 'Rata-rata Setahun';
+  headerRow.eachCell(cell => {
+    cell.font = { bold: true, color: { argb: WHITE }, size: 9 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+  });
+  headerRow.height = 20;
+  ws.getColumn(1).width = 22;
+  for (let c = 2; c <= 13; c++) ws.getColumn(c).width = 11;
+  ws.getColumn(14).width = 14;
+
+  // ── Baris data per unit ──
+  units.forEach((unit, idx) => {
+    const st = statsByUnit[unit];
+    const row = ws.getRow(headerRowIdx + 1 + idx);
+    row.getCell(1).value = unit;
+    row.getCell(1).font = { bold: true, color: { argb: NAVY }, size: 10 };
+
+    st.monthly.forEach((m, mi) => {
+      const cell = row.getCell(2 + mi);
+      if (m.total === 0) {
+        cell.value = '—';
+        cell.font = { color: { argb: 'FF999999' }, size: 9 };
+      } else if (m.category === 'not-due') {
+        cell.value = 'Belum Waktunya';
+        cell.font = { bold: true, color: { argb: fontColorForCategory('not-due') }, size: 8 };
+        cell.note = `${m.completed} dari ${m.total} PM sudah selesai — bulan ini belum berjalan`;
+      } else {
+        cell.value = m.pct / 100;
+        cell.numFmt = '0%';
+        cell.font = { bold: true, color: { argb: fontColorForCategory(m.category) }, size: 10 };
+        cell.note = m.category === 'ahead'
+          ? `${m.completed} dari ${m.total} PM sudah selesai — dikerjakan lebih awal dari jadwal`
+          : `${m.completed} dari ${m.total} PM sudah selesai`;
+      }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillForCategory(m.category) } };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = { top:{style:'thin',color:{argb:'FFDDDDDD'}}, bottom:{style:'thin',color:{argb:'FFDDDDDD'}}, left:{style:'thin',color:{argb:'FFDDDDDD'}}, right:{style:'thin',color:{argb:'FFDDDDDD'}} };
+    });
+
+    const yearCell = row.getCell(14);
+    if (st.yearPct === null) {
+      yearCell.value = '—';
+    } else {
+      yearCell.value = st.yearPct / 100;
+      yearCell.numFmt = '0%';
+    }
+    yearCell.font = { bold: true, size: 11, color: { argb: fontColorFor(st.yearPct) } };
+    yearCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillFor(st.yearPct) } };
+    yearCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    row.height = 18;
+  });
+
+  // ── Sheet kedua: Detail per equipment (opsional, memudahkan drill-down) ──
+  const ws2 = wb.addWorksheet('Detail Equipment');
+  ws2.columns = [
+    { header: 'Unit', key: 'unit', width: 18 },
+    { header: 'Area', key: 'area', width: 18 },
+    { header: 'Equipment', key: 'equipment', width: 28 },
+    { header: 'Tag No', key: 'tag', width: 14 },
+    { header: 'Bulan Planning', key: 'month', width: 16 },
+    { header: 'Status', key: 'status', width: 14 },
+  ];
+  ws2.getRow(1).eachCell(cell => {
+    cell.font = { bold: true, color: { argb: WHITE }, size: 10 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
+  });
+  const allSchedules = getData(STORE.SCHEDULES).filter(s => !unitF || s.unit === unitF);
+  allSchedules.forEach(s => {
+    const closed = hasReport(s);
+    const row = ws2.addRow({
+      unit: s.unit || '—',
+      area: s.area || '—',
+      equipment: s.equipment || '—',
+      tag: s.tagNo || '—',
+      month: MONTHS_ID[(parseInt(s.month)||1)-1],
+      status: closed ? 'Closed' : 'Outstanding'
+    });
+    const statusCell = row.getCell(6);
+    statusCell.font = { bold: true, color: { argb: closed ? GREEN : RED } };
+    statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: closed ? GREEN_BG : RED_BG } };
+  });
+
+  const buffer = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `Report_Ketercapaian_PM_${curYear}${unitF ? '_' + unitF.replace(/\s+/g,'_') : ''}.xlsx`;
+  a.click();
+  toast('📗 File Excel berhasil didownload', 'success');
 }
 
 // ════════════════════════════════════════════════════════
