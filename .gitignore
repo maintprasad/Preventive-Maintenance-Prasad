@@ -1,0 +1,10 @@
+# Rahasia — JANGAN pernah di-commit
+.env
+.env.*
+tools/backup-config.php
+
+# Hasil backup database
+backups/
+
+.vercel
+node_modules/

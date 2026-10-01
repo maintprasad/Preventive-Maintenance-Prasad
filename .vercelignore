@@ -1,0 +1,9 @@
+# Jangan ikut ter-upload ke Vercel (bisa diakses publik kalau ikut):
+tools/
+backups/
+gas/
+sql/
+test-wo.js
+*.md
+.env
+.env.*
