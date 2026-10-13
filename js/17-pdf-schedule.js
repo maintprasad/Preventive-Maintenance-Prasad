@@ -1,9 +1,45 @@
 // ════════════════════════════════════════════════════════
 //  SCHEDULE PDF — Plan vs Actual Annual View
 // ════════════════════════════════════════════════════════
+// ── Helper pasangan dropdown Unit → Area (dipakai modal PDF Schedule & modal Report Ketercapaian)
+function fillUnitAreaPair(unitId, areaId, unit = '', area = '') {
+  const unitSel = document.getElementById(unitId);
+  if (!unitSel) return;
+  const schedules = getData(STORE.SCHEDULES);
+  const units = [...new Set(schedules.map(s => s.unit || '').filter(Boolean))].sort();
+  unitSel.innerHTML = '<option value="">Semua Unit</option>' + units.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+  unitSel.value = units.includes(unit) ? unit : '';
+  onUnitAreaPairChange(unitId, areaId, area);
+}
+
+function onUnitAreaPairChange(unitId, areaId, keepArea = '') {
+  const unit = document.getElementById(unitId)?.value || '';
+  const areaSel = document.getElementById(areaId);
+  if (!areaSel) return;
+  const schedules = getData(STORE.SCHEDULES);
+  const areas = [...new Set(schedules.filter(s => !unit || s.unit === unit).map(s => s.area || '').filter(Boolean))].sort();
+  areaSel.innerHTML = '<option value="">Semua Area</option>' + areas.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+  areaSel.value = areas.includes(keepArea) ? keepArea : '';
+  if (unitId === 'dlpdf-unit') updateDownloadPDFCount();
+  if (unitId === 'cr-unit') updateCompletionReportCount();
+}
+
+function updateDownloadPDFCount() {
+  const unit = document.getElementById('dlpdf-unit')?.value || '';
+  const area = document.getElementById('dlpdf-area')?.value || '';
+  const n = getData(STORE.SCHEDULES).filter(s => (!unit || s.unit === unit) && (!area || s.area === area)).length;
+  const el = document.getElementById('dlpdf-count');
+  if (el) el.textContent = `${n} equipment akan dimasukkan ke laporan`;
+}
+
 function openDownloadPDFModal() {
   const schedules = getData(STORE.SCHEDULES);
   if (!schedules.length) { toast('Belum ada schedule PM', 'warning'); return; }
+  // Default mengikuti filter di halaman Schedule, tapi bisa diubah per unit / per area di modal
+  fillUnitAreaPair('dlpdf-unit', 'dlpdf-area',
+    document.getElementById('sch-filter-unit')?.value || '',
+    document.getElementById('sch-filter-area')?.value || '');
+  updateDownloadPDFCount();
   openOverlay('downloadPdfChoiceOverlay');
 }
 
@@ -39,8 +75,9 @@ function downloadSchedulePDF(mode = 'both') {
   const reports   = getData(STORE.REPORTS);
   if (!schedules.length) { toast('Belum ada schedule PM', 'warning'); return; }
 
-  const unitF    = document.getElementById('sch-filter-unit')?.value    || '';
-  const areaF    = document.getElementById('sch-filter-area')?.value    || '';
+  // Unit & Area diambil dari modal pilihan; periode/status/search tetap dari filter halaman
+  const unitF    = document.getElementById('dlpdf-unit')?.value || '';
+  const areaF    = document.getElementById('dlpdf-area')?.value || '';
   const periodeF = document.getElementById('sch-filter-periode')?.value || '';
   const statusF  = document.getElementById('sch-filter-status')?.value  || '';
   const searchQ  = (document.getElementById('sch-search')?.value        || '').toLowerCase();
@@ -229,9 +266,12 @@ function _pctColor(pct) { if (pct === null) return _CAT_STYLE['no-plan'].color; 
 function _pctBg(pct) { if (pct === null) return _CAT_STYLE['no-plan'].bg; if (pct >= 80) return _CAT_STYLE['good'].bg; if (pct >= 50) return _CAT_STYLE['warning'].bg; return _CAT_STYLE['critical'].bg; }
 function _pctLabel(pct) { if (pct === null) return _CAT_STYLE['no-plan'].label; if (pct >= 80) return _CAT_STYLE['good'].label; if (pct >= 50) return _CAT_STYLE['warning'].label; return _CAT_STYLE['critical'].label; }
 
-function _buildUnitAreaBreakdownHTML(unitFilter) {
-  const schedules = getData(STORE.SCHEDULES);
-  const scope = unitFilter ? schedules.filter(s => s.unit === unitFilter) : schedules;
+function _completionScope(unitFilter, areaFilter) {
+  return getData(STORE.SCHEDULES).filter(s => (!unitFilter || s.unit === unitFilter) && (!areaFilter || s.area === areaFilter));
+}
+
+function _buildUnitAreaBreakdownHTML(unitFilter, areaFilter) {
+  const scope = _completionScope(unitFilter, areaFilter);
   if (!scope.length) return '';
   const units = [...new Set(scope.map(s => s.unit || '(Tanpa Unit)'))].sort();
   let html = '';
@@ -277,29 +317,36 @@ function _buildUnitAreaBreakdownHTML(unitFilter) {
   return html;
 }
 
-function _computeCompletionStats(unitFilter) {
-  const schedules = getData(STORE.SCHEDULES);
-  const scope = unitFilter ? schedules.filter(s => s.unit === unitFilter) : schedules;
+// Statistik 12 bulan untuk sekumpulan schedule (satu unit, atau satu area di dalam unit)
+function _monthlyStats(items, curMonth) {
+  const monthly = [];
+  let planYear = 0, doneYear = 0;
+  for (let m = 1; m <= 12; m++) {
+    const plan = items.filter(s => (parseInt(s.month) || 0) === m);
+    const total = plan.length, completed = plan.filter(s => hasReport(s)).length;
+    const pct = total ? Math.round(completed / total * 100) : null;
+    const isFuture = m > curMonth;
+    monthly.push({ total, completed, pct, isFuture, category: _monthCategory(total, pct, isFuture) });
+    planYear += total; doneYear += completed;
+  }
+  const yearPct = planYear ? Math.round(doneYear / planYear * 100) : null;
+  return { monthly, planYear, doneYear, yearPct };
+}
+
+function _computeCompletionStats(unitFilter, areaFilter) {
+  const scope = _completionScope(unitFilter, areaFilter);
   const units = [...new Set(scope.map(s => s.unit || '(Tanpa Unit)'))].sort();
   const curMonth = new Date().getMonth() + 1;
   const statsByUnit = {};
   let grandPlan = 0, grandDone = 0;
   units.forEach(unit => {
-    const monthly = [];
-    let planYear = 0, doneYear = 0;
-    for (let m = 1; m <= 12; m++) {
-      const plan = scope.filter(s => (s.unit || '(Tanpa Unit)') === unit && (parseInt(s.month) || 0) === m);
-      const done = plan.filter(s => hasReport(s));
-      const total = plan.length, completed = done.length;
-      const pct = total ? Math.round(completed / total * 100) : null;
-      const isFuture = m > curMonth;
-      const category = _monthCategory(total, pct, isFuture);
-      monthly.push({ total, completed, pct, isFuture, category });
-      planYear += total; doneYear += completed;
-    }
-    const yearPct = planYear ? Math.round(doneYear / planYear * 100) : null;
-    statsByUnit[unit] = { monthly, planYear, doneYear, yearPct };
-    grandPlan += planYear; grandDone += doneYear;
+    const unitItems = scope.filter(s => (s.unit || '(Tanpa Unit)') === unit);
+    const st = _monthlyStats(unitItems, curMonth);
+    // Rincian per area di dalam unit ini
+    const areaNames = [...new Set(unitItems.map(s => s.area || '(Tanpa Area)'))].sort();
+    st.areas = areaNames.map(a => ({ name: a, ..._monthlyStats(unitItems.filter(s => (s.area || '(Tanpa Area)') === a), curMonth) }));
+    statsByUnit[unit] = st;
+    grandPlan += st.planYear; grandDone += st.doneYear;
   });
   const grandPct = grandPlan ? Math.round(grandDone / grandPlan * 100) : 0;
   return { units, statsByUnit, grandPlan, grandDone, grandPct, curMonth };
@@ -325,12 +372,43 @@ function _buildCompletionChartImage(units, statsByUnit) {
   });
 }
 
-async function downloadCompletionReportPDF() {
+// ── Modal pembuatan Report Ketercapaian: pilih Unit, Area, dan format (PDF / Excel)
+function updateCompletionReportCount() {
+  const unit = document.getElementById('cr-unit')?.value || '';
+  const area = document.getElementById('cr-area')?.value || '';
+  const scope = _completionScope(unit, area);
+  const nUnit = new Set(scope.map(s => s.unit || '(Tanpa Unit)')).size;
+  const nArea = new Set(scope.map(s => (s.unit || '') + '|' + (s.area || ''))).size;
+  const el = document.getElementById('cr-count');
+  if (el) el.textContent = `${scope.length} jadwal PM · ${nUnit} unit · ${nArea} area akan dimasukkan ke laporan`;
+}
+
+function openCompletionReportModal(format = 'pdf') {
+  if (!getData(STORE.SCHEDULES).length) { toast('Belum ada schedule PM', 'warning'); return; }
+  fillUnitAreaPair('cr-unit', 'cr-area',
+    document.getElementById('sch-filter-unit')?.value || '',
+    document.getElementById('sch-filter-area')?.value || '');
+  const fmt = document.getElementById('cr-format');
+  if (fmt) fmt.value = format;
+  updateCompletionReportCount();
+  openOverlay('completionReportOverlay');
+}
+
+function generateCompletionReport() {
+  const unit = document.getElementById('cr-unit')?.value || '';
+  const area = document.getElementById('cr-area')?.value || '';
+  const format = document.getElementById('cr-format')?.value || 'pdf';
+  closeOverlay('completionReportOverlay');
+  if (format === 'excel') exportCompletionReportExcel(unit, area);
+  else downloadCompletionReportPDF(unit, area);
+}
+
+async function downloadCompletionReportPDF(unitF = '', areaF = '') {
   const schedules = getData(STORE.SCHEDULES);
   if (!schedules.length) { toast('Belum ada schedule PM', 'warning'); return; }
-  const unitF = document.getElementById('sch-filter-unit')?.value || '';
-  const { units, statsByUnit, grandPlan, grandDone, grandPct } = _computeCompletionStats(unitF);
-  if (!units.length) { toast('Tidak ada data untuk filter unit ini', 'warning'); return; }
+  const { units, statsByUnit, grandPlan, grandDone, grandPct } = _computeCompletionStats(unitF, areaF);
+  if (!units.length) { toast('Tidak ada data untuk filter unit/area ini', 'warning'); return; }
+  const scopeLabel = [unitF, areaF].filter(Boolean).join(' · ');
 
   toast('📊 Menyiapkan grafik & laporan...', 'info');
   const chartImg = await _buildCompletionChartImage(units, statsByUnit);
@@ -350,26 +428,34 @@ async function downloadCompletionReportPDF() {
     </div>`;
   }).join('');
 
-  let headerRow = '<tr><th style="text-align:left;min-width:160px">Unit</th>';
+  let headerRow = '<tr><th style="text-align:left;min-width:160px">Unit / Area</th>';
   MONTHS_ID.forEach(m => { headerRow += `<th style="text-align:center;min-width:56px">${m.slice(0,3)}</th>`; });
   headerRow += '<th style="text-align:center;min-width:75px;background:#132c52">Rata-rata<br>Setahun</th></tr>';
 
-  let bodyRows = '';
-  units.forEach((unit, idx) => {
-    const rowBg = idx % 2 === 0 ? '#fff' : '#f7faf7';
-    const st = statsByUnit[unit];
+  // Satu baris tabel (unit atau area): label di kolom pertama + 12 sel bulan + rata-rata setahun
+  const buildStatRow = (label, st, rowBg, isArea) => {
     const cells = st.monthly.map(m => {
       const style = _CAT_STYLE[m.category];
-      if (m.total === 0) return `<td style="text-align:center;border:1px solid #ddd;background:${style.bg};color:${style.color};font-size:8pt;padding:4px 2px">—</td>`;
-      const label = (m.category === 'not-due') ? `<span style="font-size:7pt">Belum<br>Waktunya</span>` : `${m.pct}%`;
+      if (m.total === 0) return `<td style="text-align:center;border:1px solid #ddd;background:${style.bg};color:${style.color};font-size:8pt;padding:${isArea?2:4}px 2px">—</td>`;
+      const lbl = (m.category === 'not-due') ? `<span style="font-size:7pt">Belum<br>Waktunya</span>` : `${m.pct}%`;
       const sub = `<div style="font-size:6pt;color:#888;font-weight:400">${m.completed}/${m.total} PM</div>`;
-      return `<td style="text-align:center;border:1px solid #ddd;background:${style.bg};color:${style.color};font-weight:700;font-size:8pt;padding:4px 2px">${label}${sub}</td>`;
+      return `<td style="text-align:center;border:1px solid #ddd;background:${style.bg};color:${style.color};font-weight:700;font-size:${isArea?7.5:8}pt;padding:${isArea?2:4}px 2px">${lbl}${sub}</td>`;
     }).join('');
-    bodyRows += `<tr style="background:${rowBg}"><td style="padding:5px 8px;border:1px solid #ddd;font-weight:700;font-size:8.5pt;color:#1a3a6b">🏭 ${unit}</td>${cells}
-      <td style="text-align:center;border:1px solid #ddd;background:${_pctBg(st.yearPct)};color:${_pctColor(st.yearPct)};font-weight:800;font-size:9pt">${st.yearPct === null ? '—' : st.yearPct + '%'}<div style="font-size:6.5pt;color:#888;font-weight:400">${st.doneYear}/${st.planYear} PM</div></td></tr>`;
+    const labelStyle = isArea
+      ? 'padding:3px 8px 3px 24px;border:1px solid #ddd;font-weight:600;font-size:7.5pt;color:#3a5a3a'
+      : 'padding:5px 8px;border:1px solid #ddd;font-weight:700;font-size:8.5pt;color:#1a3a6b';
+    return `<tr style="background:${rowBg};page-break-inside:avoid"><td style="${labelStyle}">${isArea ? '📍' : '🏭'} ${label}</td>${cells}
+      <td style="text-align:center;border:1px solid #ddd;background:${_pctBg(st.yearPct)};color:${_pctColor(st.yearPct)};font-weight:800;font-size:${isArea?8:9}pt">${st.yearPct === null ? '—' : st.yearPct + '%'}<div style="font-size:6.5pt;color:#888;font-weight:400">${st.doneYear}/${st.planYear} PM</div></td></tr>`;
+  };
+
+  let bodyRows = '';
+  units.forEach((unit, idx) => {
+    const st = statsByUnit[unit];
+    bodyRows += buildStatRow(unit, st, idx % 2 === 0 ? '#fff' : '#f7faf7', false);
+    st.areas.forEach(a => { bodyRows += buildStatRow(a.name, a, '#fbfdfb', true); });
   });
 
-  const areaBreakdownHTML = _buildUnitAreaBreakdownHTML(unitF);
+  const areaBreakdownHTML = _buildUnitAreaBreakdownHTML(unitF, areaF);
 
   const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Report Ketercapaian PM — ${curYear}</title>
 <style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A4 landscape;margin:10mm 12mm}body{font-family:Arial,Helvetica,sans-serif;font-size:9pt;color:#111}table{width:100%;border-collapse:collapse;margin-bottom:14px}th{background:#1a3a6b;color:#fff;padding:6px 4px;font-size:7.5pt;letter-spacing:.03em}
@@ -384,7 +470,7 @@ async function downloadCompletionReportPDF() {
 </div>
 <div class="hdr-bar"><div><div style="font-size:7pt;color:rgba(255,255,255,.6);letter-spacing:.08em">PT PRASAD SEEDS INDONESIA — DEPARTEMEN MAINTENANCE</div>
 <div style="font-size:13pt;font-weight:900">REPORT KETERCAPAIAN PREVENTIVE MAINTENANCE ${curYear}</div>
-<div style="font-size:8pt;color:rgba(255,255,255,.75);margin-top:2px">Seberapa banyak jadwal PM yang sudah benar-benar selesai (Closed), per unit per bulan${unitF?' — '+unitF:''}</div></div>
+<div style="font-size:8pt;color:rgba(255,255,255,.75);margin-top:2px">Seberapa banyak jadwal PM yang sudah benar-benar selesai (Closed), per unit &amp; per area per bulan${scopeLabel?' — '+scopeLabel:''}</div></div>
 <div style="text-align:right;font-size:7.5pt;color:rgba(255,255,255,.6)"><div>Dicetak: ${printDate}</div><div style="margin-top:2px">Form: F-MTC-KPI-01 | Rev: 00</div></div></div>
 <div class="section-title">Ringkasan Keseluruhan</div>
 <div class="kpi-grid">

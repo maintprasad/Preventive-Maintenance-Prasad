@@ -278,6 +278,19 @@ function updateScheduleLastDone(report, scheduleId) {
   if (backendEnabled()) updated.forEach(s => apiOrQueue('saveSchedule', { schedule: s }, s.id));
 }
 
+// Saran Unit & Area di form laporan: daftar unit dari schedule, daftar area
+// disaring mengikuti unit yang sedang diisi. Input tetap boleh diketik bebas.
+function refreshPMUnitAreaLists() {
+  const schedules = getData(STORE.SCHEDULES);
+  const unit = (document.getElementById('pm-unit')?.value || '').trim();
+  const uniq = arr => [...new Set(arr.filter(Boolean))].sort();
+  const opts = arr => arr.map(v => `<option value="${escapeHtml(v)}">`).join('');
+  const unitList = document.getElementById('pm-unit-list');
+  const areaList = document.getElementById('pm-area-list');
+  if (unitList) unitList.innerHTML = opts(uniq(schedules.map(s => s.unit)));
+  if (areaList) areaList.innerHTML = opts(uniq(schedules.filter(s => !unit || s.unit === unit).map(s => s.area)));
+}
+
 function editReport(id) {
   window._activeScheduleId = null;
   const r = getData(STORE.REPORTS).find(x => x.id === id);

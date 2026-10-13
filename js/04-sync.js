@@ -114,7 +114,13 @@ async function syncFromSheets(auto = false) {
 
     _invalidateCache();
 
-    if (schOK && repOK) {
+    // Backend tidak ada sama sekali (mis. dibuka lewat Apache/XAMPP, bukan Vercel):
+    // jelaskan penyebabnya alih-alih pesan "sebagian data gagal sync" yang menyesatkan.
+    const notFound = r => r.status === 'rejected' && /HTTP 404/.test(r.reason?.message || '');
+    if (notFound(schRes) && notFound(repRes)) {
+      setSyncStatus('offline', 'Backend /api/db tidak ditemukan — mode lokal');
+      if (!auto) toast('Backend tidak tersedia di alamat ini. Buka lewat alamat Vercel (atau vercel dev) untuk sync.', 'warning');
+    } else if (schOK && repOK) {
       setSyncStatus('online', 'Tersinkron ' + new Date().toLocaleTimeString('id-ID'));
       if (!auto) toast('Data tersinkron dari database', 'success');
     } else {

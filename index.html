@@ -111,8 +111,8 @@
       <button class="btn-ghost" onclick="schCollapseAll()">⊟ Collapse All</button>
       <button class="btn-ghost" onclick="showPage('schedule-calendar')">📆 Calendar</button>
       <button class="btn-blue" onclick="openDownloadPDFModal()">📥 Download PDF</button>
-      <button class="btn-orange" onclick="downloadCompletionReportPDF()">📊 Report Ketercapaian (PDF)</button>
-      <button class="btn-ghost" style="border-color:rgba(74,158,63,.5);color:var(--green2)" onclick="exportCompletionReportExcel()">📗 Report Ketercapaian (Excel)</button>
+      <button class="btn-orange" onclick="openCompletionReportModal('pdf')">📊 Report Ketercapaian (PDF)</button>
+      <button class="btn-ghost" style="border-color:rgba(74,158,63,.5);color:var(--green2)" onclick="openCompletionReportModal('excel')">📗 Report Ketercapaian (Excel)</button>
       <button class="btn-primary" onclick="openScheduleModal()">+ TAMBAH</button>
     </div>
   </div>
@@ -199,8 +199,8 @@
         </select>
       </div>
       <div class="fg"><span class="flabel">Equipment Name *</span><input class="finput" type="text" id="pm-equipment-name" placeholder="Nama spesifik equipment"></div>
-      <div class="fg"><span class="flabel">Unit</span><input class="finput" type="text" id="pm-unit" placeholder="Contoh: Processing Unit 1"></div>
-      <div class="fg"><span class="flabel">Area</span><input class="finput" type="text" id="pm-area" placeholder="Contoh: Dryer Area"></div>
+      <div class="fg"><span class="flabel">Unit</span><input class="finput" type="text" id="pm-unit" list="pm-unit-list" autocomplete="off" placeholder="Pilih / ketik unit" onfocus="refreshPMUnitAreaLists()" oninput="refreshPMUnitAreaLists()"><datalist id="pm-unit-list"></datalist></div>
+      <div class="fg"><span class="flabel">Area</span><input class="finput" type="text" id="pm-area" list="pm-area-list" autocomplete="off" placeholder="Pilih / ketik area (sesuai unit)" onfocus="refreshPMUnitAreaLists()"><datalist id="pm-area-list"></datalist></div>
       <div class="fg"><span class="flabel">Periode *</span><select class="fsel2" id="pm-periode">
         <option value="Daily">Daily</option><option value="Weekly">Weekly</option><option value="Monthly" selected>Monthly</option>
         <option value="Quarterly">Quarterly</option><option value="Semi-Annual">Semi-Annual</option><option value="Annual">Annual</option>
@@ -574,7 +574,13 @@
 <div class="overlay" id="downloadPdfChoiceOverlay"><div class="modal modal-sm">
   <div class="modal-hdr"><span class="modal-title">📥 Download PDF Schedule</span><button class="modal-close" onclick="closeOverlay('downloadPdfChoiceOverlay')">×</button></div>
   <div class="modal-body">
-    <p style="color:var(--text2);font-size:13px;margin-bottom:16px">Pilih jenis laporan PDF yang ingin didownload:</p>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:10px">Pilih cakupan laporan (per unit / per area):</p>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div class="fg"><span class="flabel">Unit</span><select class="fsel2" id="dlpdf-unit" onchange="onUnitAreaPairChange('dlpdf-unit','dlpdf-area')"></select></div>
+      <div class="fg"><span class="flabel">Area</span><select class="fsel2" id="dlpdf-area" onchange="updateDownloadPDFCount()"></select></div>
+    </div>
+    <div id="dlpdf-count" style="font-size:11px;color:var(--text3);margin-bottom:14px"></div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:10px">Pilih jenis laporan PDF yang ingin didownload:</p>
     <div style="display:flex;flex-direction:column;gap:10px">
       <button class="btn-ghost" style="text-align:left;padding:14px 16px;display:flex;flex-direction:column;gap:3px;align-items:flex-start;height:auto" onclick="closeOverlay('downloadPdfChoiceOverlay');downloadSchedulePDF('planning')">
         <span style="font-weight:700;font-size:13px;color:var(--navy)">📋 Planning Only</span>
@@ -586,6 +592,21 @@
       </button>
     </div>
     <div class="form-actions" style="justify-content:flex-start;border-top:none;padding-top:6px"><button class="btn-ghost" onclick="closeOverlay('downloadPdfChoiceOverlay')">Batal</button></div>
+  </div>
+</div></div>
+
+<!-- MODAL: REPORT KETERCAPAIAN (pilih unit / area / format) -->
+<div class="overlay" id="completionReportOverlay"><div class="modal modal-sm">
+  <div class="modal-hdr"><span class="modal-title">📊 Report Ketercapaian PM</span><button class="modal-close" onclick="closeOverlay('completionReportOverlay')">×</button></div>
+  <div class="modal-body">
+    <p style="color:var(--text2);font-size:13px;margin-bottom:10px">Laporan menampilkan ketercapaian per unit, dengan rincian per area di bawahnya.</p>
+    <div class="form-grid" style="margin-bottom:6px">
+      <div class="fg"><span class="flabel">Unit</span><select class="fsel2" id="cr-unit" onchange="onUnitAreaPairChange('cr-unit','cr-area')"></select></div>
+      <div class="fg"><span class="flabel">Area</span><select class="fsel2" id="cr-area" onchange="updateCompletionReportCount()"></select></div>
+      <div class="fg"><span class="flabel">Format</span><select class="fsel2" id="cr-format"><option value="pdf">📄 PDF</option><option value="excel">📗 Excel</option></select></div>
+    </div>
+    <div id="cr-count" style="font-size:11px;color:var(--text3);margin-bottom:6px"></div>
+    <div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('completionReportOverlay')">Batal</button><button class="btn-primary" onclick="generateCompletionReport()">Buat Laporan</button></div>
   </div>
 </div></div>
 

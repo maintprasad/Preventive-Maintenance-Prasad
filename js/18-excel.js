@@ -1,12 +1,12 @@
 // ════════════════════════════════════════════════════════
 //  REPORT KETERCAPAIAN PM — EXPORT EXCEL (.xlsx, berwarna)
 // ════════════════════════════════════════════════════════
-async function exportCompletionReportExcel() {
+async function exportCompletionReportExcel(unitF = '', areaF = '') {
   if (typeof ExcelJS === 'undefined') { toast('Library Excel belum siap, coba lagi sebentar', 'error'); return; }
 
-  const unitF = document.getElementById('sch-filter-unit')?.value || '';
-  const { units, statsByUnit, grandPlan, grandDone, grandPct } = _computeCompletionStats(unitF);
-  if (!units.length) { toast('Tidak ada data untuk filter unit ini', 'warning'); return; }
+  const { units, statsByUnit, grandPlan, grandDone, grandPct } = _computeCompletionStats(unitF, areaF);
+  if (!units.length) { toast('Tidak ada data untuk filter unit/area ini', 'warning'); return; }
+  const scopeLabel = [unitF, areaF].filter(Boolean).join(' · ');
 
   toast('📗 Menyiapkan file Excel...', 'info');
   const curYear = new Date().getFullYear();
@@ -26,7 +26,7 @@ async function exportCompletionReportExcel() {
   function fontColorFor(pct) { if (pct === null) return 'FF999999'; if (pct >= 80) return GREEN; if (pct >= 50) return ORANGE; return RED; }
 
   ws.mergeCells('A1:N1');
-  ws.getCell('A1').value = `REPORT KETERCAPAIAN PREVENTIVE MAINTENANCE ${curYear}${unitF ? ' — ' + unitF : ''}`;
+  ws.getCell('A1').value = `REPORT KETERCAPAIAN PREVENTIVE MAINTENANCE ${curYear}${scopeLabel ? ' — ' + scopeLabel : ''}`;
   ws.getCell('A1').font = { size: 14, bold: true, color: { argb: WHITE } };
   ws.getCell('A1').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } };
   ws.getCell('A1').alignment = { vertical: 'middle', horizontal: 'left' };
@@ -49,20 +49,22 @@ async function exportCompletionReportExcel() {
 
   const headerRowIdx = 7;
   const headerRow = ws.getRow(headerRowIdx);
-  headerRow.getCell(1).value = 'Unit';
+  headerRow.getCell(1).value = 'Unit / Area';
   MONTHS_ID.forEach((m, i) => { headerRow.getCell(2 + i).value = m; });
   headerRow.getCell(14).value = 'Rata-rata Setahun';
   headerRow.eachCell(cell => { cell.font = { bold: true, color: { argb: WHITE }, size: 9 }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; cell.alignment = { horizontal: 'center', vertical: 'middle' }; });
   headerRow.height = 20;
-  ws.getColumn(1).width = 22;
+  ws.getColumn(1).width = 30;
   for (let c = 2; c <= 13; c++) ws.getColumn(c).width = 11;
   ws.getColumn(14).width = 14;
 
-  units.forEach((unit, idx) => {
-    const st = statsByUnit[unit];
-    const row = ws.getRow(headerRowIdx + 1 + idx);
-    row.getCell(1).value = unit;
-    row.getCell(1).font = { bold: true, color: { argb: NAVY }, size: 10 };
+  // Tulis satu baris statistik (unit atau area). Area diberi indentasi di bawah unit-nya.
+  let nextRow = headerRowIdx + 1;
+  const writeStatRow = (label, st, isArea) => {
+    const row = ws.getRow(nextRow++);
+    row.getCell(1).value = isArea ? '📍 ' + label : '🏭 ' + label;
+    row.getCell(1).font = isArea ? { color: { argb: 'FF3A5A3A' }, size: 9 } : { bold: true, color: { argb: NAVY }, size: 10 };
+    row.getCell(1).alignment = { indent: isArea ? 2 : 0, vertical: 'middle' };
 
     st.monthly.forEach((m, mi) => {
       const cell = row.getCell(2 + mi);
@@ -87,7 +89,12 @@ async function exportCompletionReportExcel() {
     yearCell.font = { bold: true, size: 11, color: { argb: fontColorFor(st.yearPct) } };
     yearCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillFor(st.yearPct) } };
     yearCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    row.height = 18;
+    row.height = isArea ? 16 : 18;
+  };
+  units.forEach(unit => {
+    const st = statsByUnit[unit];
+    writeStatRow(unit, st, false);
+    st.areas.forEach(a => writeStatRow(a.name, a, true));
   });
 
   const ws2 = wb.addWorksheet('Detail Equipment');
@@ -97,7 +104,8 @@ async function exportCompletionReportExcel() {
     { header: 'Bulan Planning', key: 'month', width: 16 }, { header: 'Status', key: 'status', width: 14 },
   ];
   ws2.getRow(1).eachCell(cell => { cell.font = { bold: true, color: { argb: WHITE }, size: 10 }; cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: NAVY } }; });
-  const allSchedules = getData(STORE.SCHEDULES).filter(s => !unitF || s.unit === unitF);
+  const allSchedules = _completionScope(unitF, areaF)
+    .sort((a, b) => (a.unit||'').localeCompare(b.unit||'') || (a.area||'').localeCompare(b.area||'') || (a.equipment||'').localeCompare(b.equipment||''));
   allSchedules.forEach(s => {
     const closed = hasReport(s);
     const row = ws2.addRow({ unit: s.unit||'—', area: s.area||'—', equipment: s.equipment||'—', tag: s.tagNo||'—', month: MONTHS_ID[(parseInt(s.month)||1)-1], status: closed?'Closed':'Outstanding' });
@@ -110,7 +118,7 @@ async function exportCompletionReportExcel() {
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `Report_Ketercapaian_PM_${curYear}${unitF ? '_' + unitF.replace(/\s+/g,'_') : ''}.xlsx`;
+  a.download = `Report_Ketercapaian_PM_${curYear}${unitF ? '_' + unitF.replace(/\s+/g,'_') : ''}${areaF ? '_' + areaF.replace(/\s+/g,'_') : ''}.xlsx`;
   a.click();
   toast('📗 File Excel berhasil didownload', 'success');
 }
