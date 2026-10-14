@@ -437,7 +437,9 @@ button,select,input{touch-action:manipulation}
    PWA + MOBILE (Android / iOS) — safe-area, dvh, bottom sheet, kartu checklist
    ════════════════════════════════════════════════════════ */
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
-body{overscroll-behavior-y:none}
+/* overscroll-behavior hanya di root (html). JANGAN di body: body ikut jadi scroll container (html+body overflow-x:hidden),
+   jadi nilai 'none' di body memutus gestur scroll ke halaman dan UI terasa freeze di Android/iOS. */
+html{overscroll-behavior-y:none}
 /* Notch / status bar iOS (apple-mobile-web-app-status-bar-style=black-translucent) & Android cutout */
 .topbar{
   padding-top:env(safe-area-inset-top);
@@ -547,7 +549,7 @@ body{overscroll-behavior-y:none}
 
 /* Mode terpasang (standalone): tidak ada address bar → cegah tarik-untuk-muat-ulang tak sengaja */
 @media(display-mode:standalone){
-  body{overscroll-behavior:none;-webkit-user-select:none;user-select:none}
+  body{-webkit-user-select:none;user-select:none}
   input,textarea,select,[contenteditable]{-webkit-user-select:text;user-select:text}
 }
 @media print{.pwa-bar,#pwa-offline-banner{display:none!important}}
@@ -582,4 +584,9 @@ body:has(.sidebar.open) .pwa-bar{display:none}
 @media(max-width:768px){
   /* Judul kartu laporan boleh turun baris (dulu terpotong "Cold Storage 1 M…") */
   .report-item div[style*="font-weight:700;font-size:14px"]{white-space:normal !important;word-break:break-word}
+}
+
+/* body tidak boleh jadi scroll container (overflow-x:hidden memaksa overflow-y:auto). Dengan clip, gestur scroll langsung ke halaman — lebih aman di iOS/Android. */
+@supports (overflow:clip){
+  body{overflow-x:clip !important}
 }

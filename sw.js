@@ -17,7 +17,7 @@
    NAIKKAN VERSION setiap rilis yang mengubah daftar berkas di SHELL_FILES.
    ════════════════════════════════════════════════════════ */
 'use strict';
-const VERSION = 'pm-3.1.0';
+const VERSION = 'pm-3.1.1';
 const SHELL_CACHE = VERSION + '-shell';
 const CDN_CACHE = 'pm-cdn-v1';              // CDN versinya sudah dikunci di URL → tidak ikut VERSION
 const NETWORK_TIMEOUT_MS = 5000;

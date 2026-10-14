@@ -253,3 +253,18 @@ membaca kode.
   dengan setpoint 12°C.
 - **Turso**: template `cold_storage` dan 19 laporan diperbarui lewat `node tools/seed-coldstorage.js --send`.
   Laporan yang sudah tersinkron di perangkat lain otomatis ditimpa versi baru saat sync (updatedAt lebih baru).
+
+---
+
+# Perbaikan: UI HP tidak bisa di-scroll (freeze)
+
+## 13. Penyebab & perbaikan
+
+- **Gejala:** di Android dan iOS halaman terasa freeze — tidak bisa di-scroll naik/turun.
+- **Penyebab:** aturan `body{overscroll-behavior-y:none}` (ditambahkan di rilis PWA). Karena `html` dan `body` sama-sama
+  `overflow-x:hidden`, `body` ikut menjadi scroll container; nilai `none` di sana memutus gestur scroll ke halaman.
+- **Perbaikan:** `overscroll-behavior-y:none` dipindah ke `html` (root), aturan di `body` dihapus, dan `body` memakai
+  `overflow-x:clip` sehingga tidak lagi menjadi scroll container. Diuji dengan event sentuh nyata (bukan scroll lewat JS):
+  Dashboard, Daftar Laporan, Pengaturan, Input PM, isi modal, dan sidebar bisa di-scroll; tidak ada overflow horizontal.
+- `sw.js` VERSION dinaikkan ke `pm-3.1.1` agar perangkat yang sudah memasang aplikasi mengambil CSS baru.
+- `tools/check-css.js` — penjaga regresi (gagal bila `overscroll-behavior` kembali dipasang di `body`).
