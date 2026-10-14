@@ -268,3 +268,19 @@ membaca kode.
   Dashboard, Daftar Laporan, Pengaturan, Input PM, isi modal, dan sidebar bisa di-scroll; tidak ada overflow horizontal.
 - `sw.js` VERSION dinaikkan ke `pm-3.1.1` agar perangkat yang sudah memasang aplikasi mengambil CSS baru.
 - `tools/check-css.js` — penjaga regresi (gagal bila `overscroll-behavior` kembali dipasang di `body`).
+
+---
+
+# Cetak laporan PM: tidak ada bagian yang terpotong
+
+## 14. Perubahan
+
+- **Masalah:** saat dicetak, tabel Pengesahan (beserta tanda tangan digital) bisa terbelah di antara dua halaman sehingga
+  sebagian terpotong; laporan 12 item juga memakai dua halaman.
+- **Perbaikan** (`js/16-pdf-report.js`): aturan `break-inside: avoid` untuk setiap baris tabel, setiap item checklist beserta
+  RCA-nya (satu `<tbody class="it">`), dan blok kecil (PPE, Spare Parts, Catatan, Pengesahan + footer) yang dibungkus
+  `.blk`; judul seksi tidak ditinggal sendirian di akhir halaman. Saat dicetak tata letak sedikit dipadatkan (margin,
+  padding baris, tinggi tanda tangan) sehingga laporan 12 item (termasuk yang punya satu RCA) muat **satu halaman A4**.
+  Laporan dengan banyak RCA tetap memakai dua halaman, tetapi pemisahnya bersih (tidak ada yang terpotong).
+- Fungsi baru `buildPMBatchHTML(list, sigs, title)` — menggabungkan banyak laporan menjadi satu dokumen cetak (tiap laporan
+  mulai di halaman baru); dipakai oleh "Print Semua" di Daftar Laporan.
