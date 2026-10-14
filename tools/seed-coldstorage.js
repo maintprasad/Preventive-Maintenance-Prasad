@@ -2,14 +2,16 @@
 /**
  * seed-coldstorage.js — Data awal PM Cold Storage (Unit 2 → Cold Storage).
  *
- * Penamaan mengikuti data yang sudah ada: "Cold Storage <n> Mesin <m>" (CS1 Mesin 1–3 = TAG-449..451).
+ * Penamaan mengikuti data yang sudah ada di database: "Cold Storage <n> Mesin <m>" dengan tag asli
+ * (CS1: TAG-449..453, CS2: TAG-454..458, CS3: TAG-459..462, CS4: TAG-463..467 = 19 mesin).
  *
  * Isi:
  *   - master  : Unit 2 → area "Cold Storage", tipe equipment "Cold Storage"
  *   - template: 10 item checklist PM Cold Storage (diambil dari js/00-config.js)
- *   - schedule: CS1–CS4, tiap CS punya MESIN_PER_CS mesin, periode Quarterly (3 bulanan).
- *               Urutan start: CS1 Juni, CS2 Juli, CS3 Agustus, CS4 September.
- *   - laporan : PM lengkap oleh Aynur — semua mesin di CS1 (Juni) s/d CS4 (September), 10 checklist
+ *   - schedule: jadwal mesin yang SUDAH ADA (dicocokkan lewat Tag No) DIPERBARUI jadi tipe Cold Storage,
+ *               periode Quarterly (3 bulanan), bulan start: CS1 Juni, CS2 Juli, CS3 Agustus, CS4 September.
+ *               Field lain (id, catatan, createdAt, dll.) dipertahankan. Mesin yang belum punya jadwal dibuat baru.
+ *   - laporan : PM lengkap oleh Aynur — seluruh 19 mesin CS1 (Juni) s/d CS4 (September), 10 checklist
  *               per mesin. Item yang ditemukan anomali dilengkapi RCA (temuan, akar penyebab,
  *               tindakan, pencegahan).
  *
@@ -34,7 +36,6 @@ if (!Array.isArray(CHECKLIST) || CHECKLIST.length !== 10) throw new Error('Check
 const UNIT = 'Unit 2';
 const AREA = 'Cold Storage';
 const TECH = 'Aynur';
-const MESIN_PER_CS = 3;   // CS1 sudah terdaftar dengan Mesin 1–3; ubah bila CS lain berbeda
 const BULAN = ['', 'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 // Sama dengan getWeekOfMonth() di js/01-utils.js
@@ -46,10 +47,10 @@ function weekOfMonth(iso) {
 
 // Tanggal PM per CS: mesin 1, 2, 3 dikerjakan berurutan dalam 3 hari kerja.
 const CS = {
-  1: { month: 6, days: ['2026-06-08', '2026-06-09', '2026-06-10'], tags: ['TAG-449', 'TAG-450', 'TAG-451'] },   // tag CS1 sesuai data yang sudah ada
-  2: { month: 7, days: ['2026-07-13', '2026-07-14', '2026-07-15'], tags: ['CS2-M1', 'CS2-M2', 'CS2-M3'] },
-  3: { month: 8, days: ['2026-08-10', '2026-08-11', '2026-08-12'], tags: ['CS3-M1', 'CS3-M2', 'CS3-M3'] },
-  4: { month: 9, days: ['2026-09-07', '2026-09-08', '2026-09-09'], tags: ['CS4-M1', 'CS4-M2', 'CS4-M3'] },
+  1: { month: 6, firstTag: 449, days: ['2026-06-08', '2026-06-09', '2026-06-10', '2026-06-11', '2026-06-12'] },   // 5 mesin
+  2: { month: 7, firstTag: 454, days: ['2026-07-13', '2026-07-14', '2026-07-15', '2026-07-16', '2026-07-17'] },   // 5 mesin
+  3: { month: 8, firstTag: 459, days: ['2026-08-10', '2026-08-11', '2026-08-12', '2026-08-13'] },                 // 4 mesin
+  4: { month: 9, firstTag: 463, days: ['2026-09-07', '2026-09-08', '2026-09-09', '2026-09-10', '2026-09-11'] },   // 5 mesin
 };
 const nameOf = (c, m) => `Cold Storage ${c} Mesin ${m}`;
 const nextMonthOf = month => BULAN[((month + 2) % 12) + 1];   // +3 bulan
@@ -145,24 +146,19 @@ function normalItem(no, c, m) {
   }
 }
 
-const schedules = [];
+const machines = [];   // daftar mesin untuk pembentukan jadwal
 const reports = [];
 for (const c of Object.keys(CS).map(Number)) {
   const cs = CS[c];
-  for (let m = 1; m <= MESIN_PER_CS; m++) {
+  for (let m = 1; m <= cs.days.length; m++) {
     const date = cs.days[m - 1];
     const week = weekOfMonth(date);
     const key = `${c}.${m}`;
-    const tag = cs.tags[m - 1];
+    const tag = `TAG-${cs.firstTag + m - 1}`;
     const temuan = TEMUAN[key] || {};
     const ts = `${date}T0${2 + m}:15:00.000Z`;
 
-    schedules.push({
-      id: `SCH-CS${c}-M${m}`, unit: UNIT, area: AREA, equipment: nameOf(c, m), tagNo: tag, equipmentType: 'cold_storage',
-      periode: 'Quarterly', month: cs.month, week, pic: TECH, lastDone: date, mp: 1, hari: 1,
-      notes: `PM Cold Storage 3 bulanan. Siklus start ${BULAN[cs.month]}, berikutnya ${nextMonthOf(cs.month)}.`,
-      startDate: '2026-06-01', createdAt: '2026-06-01T00:00:00.000Z', updatedAt: ts,
-    });
+    machines.push({ c, m, tag, date, week, ts, month: cs.month });
 
     const aktivitas = CHECKLIST.map((uraian, i) => {
       const no = i + 1;
@@ -185,6 +181,28 @@ for (const c of Object.keys(CS).map(Number)) {
     });
   }
 }
+
+// Bangun daftar jadwal. existing = jadwal dari database (dicocokkan lewat Tag No) → diperbarui,
+// field lain dipertahankan. Tanpa existing (dry-run/uji) semua dibuat baru.
+function buildSchedules(existing = []) {
+  const byTag = new Map(existing.filter(s => s && s.tagNo).map(s => [String(s.tagNo).trim().toLowerCase(), s]));
+  const now = new Date().toISOString();
+  return machines.map(({ c, m, tag, date, week, month }) => {
+    const cur = byTag.get(tag.toLowerCase());
+    return {
+      ...(cur || {}),
+      id: cur ? cur.id : `SCH-CS${c}-M${m}`,
+      unit: UNIT, area: AREA, equipment: nameOf(c, m), tagNo: tag, equipmentType: 'cold_storage',
+      periode: 'Quarterly', month, week,
+      pic: (cur && cur.pic) || TECH, lastDone: date,
+      notes: (cur && cur.notes) || `PM Cold Storage 3 bulanan. Siklus start ${BULAN[month]}, berikutnya ${nextMonthOf(month)}.`,
+      startDate: (cur && cur.startDate) || '2026-06-01',
+      createdAt: (cur && cur.createdAt) || '2026-06-01T00:00:00.000Z',
+      updatedAt: now,
+    };
+  });
+}
+const schedules = buildSchedules();
 
 const payload = {
   master: { units: [{ name: UNIT, areas: [AREA] }], eqtypes: [{ key: 'cold_storage', label: 'Cold Storage' }] },
@@ -214,17 +232,18 @@ function validate() {
 function summary() {
   console.log(`Master   : ${UNIT} → ${AREA}; tipe "Cold Storage" (cold_storage)`);
   console.log(`Template : cold_storage, ${CHECKLIST.length} item`);
-  console.log(`Schedule : ${schedules.length} (Quarterly) — ` + schedules.map(s => `${s.equipment} bln ${s.month}`).join(', '));
+  console.log(`Schedule : ${schedules.length} mesin (Quarterly) — ` + [1, 2, 3, 4].map(c => `CS${c}: ${machines.filter(x => x.c === c).length} mesin bln ${CS[c].month}`).join(', '));
   reports.forEach(r => {
     const an = r.aktivitas.filter(a => a.no_checked).length;
     console.log(`Laporan  : ${r.date}  ${r.equipmentName}  ${r.teknisi}  checklist ${r.aktivitas.length}/10, anomali+RCA ${an}  (${r.id})`);
   });
 }
 
-async function send() {
+// poster(body) → JSON hasil. Default: HTTP ke PM_URL/api/db. Bisa diganti (mis. uji in-process).
+function httpPoster() {
   const base = (process.env.PM_URL || '').replace(/\/+$/, '');
   if (!/^https?:\/\//.test(base)) throw new Error('Set PM_URL, mis. PM_URL=https://app-anda.vercel.app');
-  const post = async body => {
+  return async body => {
     const res = await fetch(base + '/api/db', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-App-Key': process.env.PM_APP_KEY || '' },
@@ -234,11 +253,22 @@ async function send() {
     if (!res.ok || !json || !json.success) throw new Error(`${body.action} gagal: HTTP ${res.status} ${json ? json.message : ''}`);
     return json;
   };
+}
+
+async function send(poster) {
+  const post = poster || httpPoster();
+  // Ambil jadwal yang sudah ada supaya mesin Cold Storage diperbarui, bukan diduplikasi.
+  const cur = await post({ action: 'getSchedules' });
+  const existing = (cur.schedules || []).filter(s => s.area === AREA || machines.some(x => x.tag === s.tagNo));
+  const toSend = buildSchedules(existing);
+  const updated = toSend.filter(s => existing.some(e => e.id === s.id)).length;
+  console.log(`Jadwal ada di database: ${updated} diperbarui, ${toSend.length - updated} dibuat baru`);
+  payload.schedules = toSend;
   // Satu batch kecil per langkah supaya kegagalan mudah dilacak.
   for (const [label, body] of [
     ['master', { master: payload.master }],
     ['template', { templates: payload.templates }],
-    ['schedule', { schedules: payload.schedules }],
+    ['schedule', { schedules: toSend }],
     ['laporan', { reports: payload.reports }],
   ]) {
     const r = await post({ action: 'bulkUpsert', ...body });
@@ -248,12 +278,12 @@ async function send() {
   console.log('Selesai. Buka aplikasi → klik ↻ Sync untuk menarik data baru.');
 }
 
-async function main(sendIt) {
+async function main(sendIt, poster) {
   validate();
   summary();
   if (!sendIt) { console.log('\nDRY-RUN: validasi lolos, tidak ada data dikirim. Tambahkan --send (dan PM_URL / PM_APP_KEY) untuk mengirim.'); return; }
   console.log('');
-  await send();
+  await send(poster);
 }
 
 module.exports = { payload, validate, main };

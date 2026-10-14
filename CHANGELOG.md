@@ -181,7 +181,7 @@ membaca kode.
 | 6 | **RCA** (temuan, akar penyebab, tindakan perbaikan, pencegahan) per item anomali: kotak muncul saat item ditandai "Tidak", tersimpan di `aktivitas[i].rca`, tampil di PDF, dan akar penyebab ikut ke deskripsi WO. Submit dengan RCA belum lengkap meminta konfirmasi | `js/11-form-pm.js`, `js/16-pdf-report.js`, `js/19-wo.js` |
 | 7 | Pesan sync yang jelas bila `/api/db` tidak ditemukan (mis. dibuka lewat XAMPP) | `js/04-sync.js` |
 | 8 | Backend: tabel `master`, aksi `getMaster` / `saveMaster` (digabung union di server), dan `master` di `bulkUpsert` | `api/db.js`, `sql/schema.sql` |
-| 9 | Data PM Cold Storage Unit 2: CS1–CS4 (Quarterly), 12 mesin, 12 laporan Aynur Jun–Sep 2026 lengkap 10 checklist, anomali dengan RCA | `tools/seed-coldstorage.js` |
+| 9 | Data PM Cold Storage Unit 2: CS1–CS4 (Quarterly), 19 mesin, 19 laporan Aynur Jun–Sep 2026 lengkap 10 checklist, anomali dengan RCA | `tools/seed-coldstorage.js` |
 | 10 | Uji integrasi API (SQLite in-memory sebagai pengganti Turso) | `tools/test-api.js` |
 
 ## 8. Langkah rilis produksi
@@ -200,12 +200,14 @@ membaca kode.
 
 ## 9. Catatan data seed Cold Storage
 
-- Penamaan mengikuti data yang sudah ada: **Cold Storage <n> Mesin <m>**. CS1 Mesin 1–3 memakai tag
-  yang sudah terdaftar (TAG-449..451); tag CS2–CS4 (`CS2-M1` dst.) adalah penanda sementara —
-  ganti lewat Schedule → Edit bila tag aslinya berbeda.
-- Urutan PM: CS1 **Juni**, CS2 **Juli**, CS3 **Agustus**, CS4 **September**; tiap CS diulang tiap
-  3 bulan (CS1 berikutnya September, CS2 Oktober, CS3 November, CS4 Desember). Semua mesin pada
-  CS tersebut dikerjakan lengkap dengan 10 checklist. Jumlah mesin per CS diatur oleh konstanta
-  `MESIN_PER_CS` (saat ini 3, mengikuti CS1).
+- Mengikuti data yang sudah ada di database: **Cold Storage <n> Mesin <m>** dengan tag aslinya —
+  CS1 5 mesin (TAG-449..453), CS2 5 mesin (TAG-454..458), CS3 4 mesin (TAG-459..462),
+  CS4 5 mesin (TAG-463..467) — total **19 mesin**.
+- Jadwal mesin yang sudah ada **diperbarui di tempat** (id dan field lain dipertahankan): tipe jadi
+  `cold_storage`, periode **Annual → Quarterly**, bulan start CS1 Juni, CS2 Juli, CS3 Agustus,
+  CS4 September (berikutnya +3 bulan). Panel MCC/Antiroom tidak disentuh. Salinan jadwal sebelum
+  diubah: `backups/cs-schedules-before-quarterly.json` (tidak di-commit).
+- 19 laporan PM oleh Aynur, 10 checklist per mesin; 7 anomali dilengkapi RCA. Laporan PM kompresor
+  tahunan CS1 Mesin 1–3 (14 Juli) tetap ada.
 - Isi laporan (angka pengukuran, temuan, dan RCA) adalah data contoh untuk pengisian awal, bukan
   hasil pengukuran lapangan. Koreksi lewat **Daftar Laporan → ✏ Edit** bila perlu.

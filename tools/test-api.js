@@ -132,16 +132,22 @@ const t = async (name, fn) => { try { await fn(); passed++; console.log('  ✓',
       return realFetch(url, init);
     };
     process.env.PM_APP_KEY = 'test-key-123456';
+    // jadwal lama (TAG-449, Annual) sudah ada sebelum seed → harus DIPERBARUI, bukan diduplikasi
+    await call('saveSchedule', { schedule: { id: 'SCH-410', unit: 'Unit 2', area: 'Cold Storage', equipment: 'Cold Storage 1 Mesin 1', tagNo: 'TAG-449', equipmentType: 'compressor', periode: 'Annual', month: 7, week: 2, notes: 'catatan lama', updatedAt: '2026-07-14T03:20:30.648Z' } });
     const origLog = console.log; console.log = () => {};
     try { await require('./seed-coldstorage.js').main(true); } finally { console.log = origLog; }
-    posted.forEach(p => { assert.equal(p.result.success, true); assert.equal(p.result.rejected, 0); });
+    posted.forEach(p => { assert.equal(p.result.success, true); if (p.action === 'bulkUpsert') assert.equal(p.result.rejected, 0); });
     const reps = (await call('getReports')).reports.filter(r => r.id.startsWith('PM-CS-2026'));
-    assert.equal(reps.length, 12);
+    assert.equal(reps.length, 19);
     assert.ok(reps.every(r => r.teknisi === 'Aynur' && JSON.parse(r.aktivitas).length === 10));
     assert.deepEqual([...new Set(reps.map(r => r.equipmentName.slice(0, 14)))].sort(), ['Cold Storage 1', 'Cold Storage 2', 'Cold Storage 3', 'Cold Storage 4']);
     const rcaCount = reps.reduce((n, r) => n + JSON.parse(r.aktivitas).filter(a => a.no_checked && a.rca && a.rca.penyebab).length, 0);
     assert.equal(rcaCount, 7);
     assert.equal((await call('getTemplates')).templates.cold_storage.length, 10);
+    const cs = (await call('getSchedules')).schedules.filter(s => /^Cold Storage [1-4] Mesin [1-5]$/.test(s.equipment) && s.equipmentType === 'cold_storage');
+    assert.equal(cs.length, 19, 'harus 19 jadwal mesin, tanpa duplikat');
+    const old = cs.find(s => s.tagNo === 'TAG-449');
+    assert.equal(old.id, 'SCH-410'); assert.equal(old.periode, 'Quarterly'); assert.equal(old.notes, 'catatan lama'); assert.equal(old.month, 6);
     global.fetch = realFetch;
   });
 
