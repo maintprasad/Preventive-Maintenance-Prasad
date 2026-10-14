@@ -497,3 +497,11 @@ function previewCurrentForm() {
   data.id = 'PREVIEW-' + Date.now();
   openPDFOverlay(data);
 }
+
+// Ketuk di mana saja pada sel OK/Tidak (bukan hanya kotak centang kecil) agar nyaman di layar sentuh.
+document.addEventListener('click', e => {
+  const td = e.target.closest && e.target.closest('#pm-aktivitas-tbody td');
+  if (!td || e.target.tagName === 'INPUT' || e.target.closest('.rca-box')) return;
+  const cb = td.querySelector('input[type=checkbox]');
+  if (cb) cb.click();
+});

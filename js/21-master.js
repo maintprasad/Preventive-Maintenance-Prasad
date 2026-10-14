@@ -106,11 +106,12 @@ function refreshUnitAreaDatalists(unitInputId, unitListId, areaListId) {
 }
 
 // ════════════════════════════════════════════════════════
-//  MODAL "KELOLA DATA MASTER"
+//  HALAMAN "PENGATURAN" (menu sidebar): Unit, Area, Equipment, Tipe + Checklist
 // ════════════════════════════════════════════════════════
-function openMasterModal() {
-  renderMasterModal();
-  openOverlay('masterOverlay');
+function loadSettingsPage() {
+  applyMasterToRuntime();
+  renderSettingsPage();
+  if (typeof pwaRefreshUI === 'function') pwaRefreshUI();
 }
 
 function _fillSelect(id, values, placeholder, keep = '') {
@@ -125,7 +126,7 @@ function onMasterEqUnitChange() {
   _fillSelect('mst-eq-area', unit ? getAllAreas(unit) : [], unit ? '-- Pilih Area --' : '-- Pilih Unit dulu --');
 }
 
-function renderMasterModal() {
+function renderSettingsPage() {
   const units = getAllUnits();
   _fillSelect('mst-area-unit', units, '-- Pilih Unit --', document.getElementById('mst-area-unit')?.value);
   _fillSelect('mst-eq-unit', units, '-- Pilih Unit --', document.getElementById('mst-eq-unit')?.value);
@@ -143,6 +144,9 @@ function renderMasterModal() {
   }).join('') || '<div style="font-size:12px;color:var(--text3)">Belum ada unit.</div>';
   document.getElementById('mst-tree').innerHTML = tree;
 
+  _fillChecklistTypeSelect();
+  renderChecklistPreview();
+
   const templates = getLocalTemplates();
   document.getElementById('mst-types').innerHTML = Object.entries(EQ_LABELS)
     .sort((a, b) => a[1].localeCompare(b[1]))
@@ -157,7 +161,7 @@ function addMasterUnit() {
   saveMasterLocal(mergeMasterData(getMaster(), { units: [{ name, areas: [] }] }));
   pushMaster('units');
   input.value = '';
-  renderMasterModal();
+  renderSettingsPage();
   populateUnitFilters();
   toast(`Unit "${name}" ditambahkan — lanjut tambah Area`, 'success');
   const sel = document.getElementById('mst-area-unit'); if (sel) sel.value = name;
@@ -173,7 +177,7 @@ function addMasterArea() {
   saveMasterLocal(mergeMasterData(getMaster(), { units: [{ name: unit, areas: [name] }] }));
   pushMaster('units');
   input.value = '';
-  renderMasterModal();
+  renderSettingsPage();
   toast(`Area "${name}" ditambahkan ke ${unit}`, 'success');
 }
 
@@ -181,8 +185,49 @@ function addMasterEquipment() {
   const unit = document.getElementById('mst-eq-unit').value;
   const area = document.getElementById('mst-eq-area').value;
   if (!unit || !area) { toast('Pilih unit dan area terlebih dahulu', 'error'); return; }
-  closeOverlay('masterOverlay');
   openScheduleModal(null, { unit, area });
+}
+
+// ── Tambah item checklist ke tipe yang sudah ada (tanpa pindah halaman) ──
+function _fillChecklistTypeSelect(select = '') {
+  const el = document.getElementById('mst-chk-type');
+  if (!el) return;
+  const cur = select || el.value;
+  const entries = Object.entries(EQ_LABELS).sort((a, b) => a[1].localeCompare(b[1]));
+  el.innerHTML = '<option value="">-- Pilih tipe equipment --</option>' + entries.map(([k, l]) => `<option value="${escapeHtml(k)}">${escapeHtml(l)}</option>`).join('');
+  el.value = EQ_LABELS[cur] ? cur : '';
+}
+
+function renderChecklistPreview() {
+  const type = document.getElementById('mst-chk-type')?.value || '';
+  const box = document.getElementById('mst-chk-list');
+  if (!box) return;
+  if (!type) { box.innerHTML = '<div class="settings-hint">Pilih tipe equipment untuk melihat checklist-nya.</div>'; return; }
+  const items = getLocalTemplates()[type] || [];
+  box.innerHTML = items.length
+    ? `<div class="settings-hint">${items.length} item saat ini:</div><ol>${items.map(i => `<li>${escapeHtml(i)}</li>`).join('')}</ol>`
+    : '<div class="settings-hint">Belum ada item checklist untuk tipe ini.</div>';
+}
+
+function addChecklistItemFromSettings() {
+  const type = document.getElementById('mst-chk-type')?.value || '';
+  const input = document.getElementById('mst-chk-item');
+  const text = neutralizeText((input.value || '').trim()).slice(0, 300);
+  if (!type) { toast('Pilih tipe equipment terlebih dahulu', 'error'); return; }
+  if (!text) { toast('Isi item checklist terlebih dahulu', 'error'); return; }
+  const templates = getLocalTemplates();
+  const items = templates[type] || [];
+  if (items.some(i => i.trim().toLowerCase() === text.toLowerCase())) { toast('Item itu sudah ada di checklist', 'warning'); return; }
+  if (items.length >= 100) { toast('Maksimal 100 item checklist per tipe', 'error'); return; }
+  templates[type] = [...items, text];
+  saveLocalTemplates(templates);
+  applyLocalTemplates();
+  _pushTemplate(type, templates[type]);
+  input.value = '';
+  renderChecklistPreview();
+  renderSettingsPage();
+  if (document.getElementById('page-templates')?.classList.contains('active')) renderTemplatePage();
+  toast(`Item ditambahkan ke checklist ${EQ_LABELS[type]}`, 'success');
 }
 
 function _slugEqType(label) {
@@ -213,8 +258,10 @@ function addMasterEquipmentType() {
 
   document.getElementById('mst-type-label').value = '';
   document.getElementById('mst-type-items').value = '';
-  renderMasterModal();
+  renderSettingsPage();
   if (document.getElementById('page-templates')?.classList.contains('active')) renderTemplatePage();
+  _fillChecklistTypeSelect(key);
+  renderChecklistPreview();
   toast(`Tipe "${label}" ditambahkan dengan ${items.length} item checklist`, 'success');
 }
 

@@ -226,7 +226,7 @@ function downloadSchedulePDF(mode = 'both') {
   <button onclick="window.close()" style="margin-left:auto;background:none;border:1px solid #ccc;padding:6px 14px;border-radius:5px;cursor:pointer;font-size:11px">✕ Tutup</button>
 </div>
 <div style="display:flex;align-items:center;gap:14px;padding:10px 0 8px;border-bottom:2px solid #1a3a6b;margin-bottom:10px">
-  <div style="flex-shrink:0"><img src="${document.querySelector('.brand img')?.src || ''}" style="height:40px;width:auto;object-fit:contain"></div>
+  <div style="flex-shrink:0"><img src="${document.querySelector('.brand img')?.src || ''}" style="height:40px;width:auto;object-fit:contain" onerror="this.style.display='none'"></div>
   <div style="flex:1"><div style="font-size:13pt;font-weight:900;color:#1a3a6b">Preventive Maintenance ${curYear} — ${modeLabel}</div>
   <div style="font-size:9pt;font-weight:600;color:#3a5a3a;margin-top:1px">${isPlanningOnly ? 'Jadwal Tahunan (Planning Only) untuk' : 'Annual Preventive Maintenance plan for'}: ${unitLabel}</div></div>
   <div style="text-align:right;font-size:7.5pt;color:#888"><div>Dicetak: ${printDate}</div><div style="margin-top:2px">Form: F-MTC-PLN-01 | Rev: 00</div></div>

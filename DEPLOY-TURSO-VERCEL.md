@@ -160,3 +160,15 @@ schtasks /create /tn "Backup Turso PM" /sc daily /st 17:00 /tr "\"D:\Xampp\htdoc
 Setiap backup adalah snapshot penuh: tabel di `pm_backup` di-drop lalu diisi
 ulang sama persis dengan isi Turso saat itu. Snapshot lama tetap ada sebagai
 file `.sql` di folder `backups`.
+
+## 6. PWA (pasang di HP & offline)
+
+Tidak ada langkah tambahan — cukup deploy. Setelah itu:
+
+1. Buka alamat Vercel di Chrome Android → muncul bar **Pasang** (atau menu ⋮ → *Instal aplikasi*).
+   Di iPhone/iPad (Safari): **Bagikan → Tambah ke Layar Utama**.
+2. Aplikasi terpasang memakai ikon `icons/icon-*.png`, tampil layar penuh, dan tetap bisa dibuka tanpa sinyal.
+3. Pembaruan: saat ada versi baru muncul bar **Perbarui**; atau **Pengaturan → Aplikasi → Periksa Pembaruan**.
+
+Pemeriksaan cepat setelah deploy: buka `/manifest.webmanifest` dan `/sw.js` (keduanya harus tampil, bukan 404),
+lalu Chrome DevTools → Application → *Manifest* / *Service Workers* tanpa error.

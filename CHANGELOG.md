@@ -211,3 +211,29 @@ membaca kode.
   tahunan CS1 Mesin 1–3 (14 Juli) tetap ada.
 - Isi laporan (angka pengukuran, temuan, dan RCA) adalah data contoh untuk pengisian awal, bukan
   hasil pengukuran lapangan. Koreksi lewat **Daftar Laporan → ✏ Edit** bila perlu.
+
+---
+
+# Rilis Oktober 2026 (2) — Menu Pengaturan, PWA, tampilan Android & iOS
+
+## 10. Perubahan
+
+| # | Perubahan | Berkas |
+|---|---|---|
+| 1 | Menu sidebar **Pengaturan** → halaman **Unit, Area & Equipment**: tambah Unit, Area, Equipment, Tipe Equipment + checklist, dan **tambah item checklist** ke tipe yang ada (modal "Kelola Master" dihapus; tombolnya di Schedule/Template dipindah ke sini). Juga ada di menu More (HP) | `index.html`, `js/21-master.js`, `js/06-nav.js` |
+| 2 | **PWA**: `manifest.webmanifest` (ikon any + maskable, shortcut Input PM / Outstanding / Schedule), service worker `sw.js` (offline, network-first untuk aplikasi, cache-first untuk CDN, `/api` tidak pernah di-cache), ikon aplikasi di `icons/` | `manifest.webmanifest`, `sw.js`, `icons/`, `js/22-pwa.js` |
+| 3 | Pasang ke layar utama: tombol/bar **Pasang** (Android/desktop), petunjuk **Tambah ke Layar Utama** (iOS), bar **Perbarui** saat versi baru (tidak memuat ulang paksa), banner **Offline**, kartu "Aplikasi" di Pengaturan (status, versi, periksa pembaruan, hapus cache) | `js/22-pwa.js`, `index.html` |
+| 4 | Tampilan HP: safe-area (notch/status bar iOS, gesture bar), `100dvh`, modal sebagai bottom sheet, **checklist PM jadi kartu per item** (OK/Tidak besar, seluruh sel bisa diketuk), top bar ringkas, tombol header tidak terpotong, sidebar tertutup tidak lagi membocorkan bayangan | `css/style.css`, `js/11-form-pm.js` |
+| 5 | Viewport tidak lagi mengunci zoom; kunci zoom JS (yang menelan ketukan cepat berurutan) dihapus | `index.html`, `js/06-nav.js` |
+| 6 | `vercel.json`: `connect-src` untuk CDN (dipakai service worker), `worker-src`, `manifest-src`, header `sw.js` (no-cache) dan manifest | `vercel.json` |
+| 7 | Logo di top bar memakai ikon baru (`assets/logo.png` memang tidak ada di repo); PDF schedule menyembunyikan logo yang gagal dimuat | `index.html`, `js/17-pdf-schedule.js` |
+
+## 11. Catatan rilis PWA
+
+- **HTTPS wajib** untuk service worker & pemasangan (Vercel sudah HTTPS; `localhost` juga boleh untuk uji).
+- **Naikkan `VERSION` di `sw.js`** (dan `js/22-pwa.js` bila perlu) setiap kali daftar berkas aplikasi berubah
+  (menambah/menghapus `js/*.js`, ikon, dsb.), supaya cache lama dibersihkan. Perubahan isi berkas biasa
+  tidak perlu: aplikasi memakai network-first sehingga selalu mengambil versi terbaru saat online.
+- Data laporan/jadwal disimpan di `localStorage` (bukan di cache service worker), jadi "Hapus Cache Offline"
+  tidak menghapus data. Antrian sync tetap terkirim otomatis saat kembali online.
+- iOS: tidak ada prompt resmi — pengguna memasang lewat Bagikan → Tambah ke Layar Utama. Notifikasi push tidak dipakai.

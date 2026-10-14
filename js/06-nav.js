@@ -26,7 +26,7 @@ function showPage(page, fromHistory = false) {
   const el = document.getElementById('page-' + page);
   if (el) el.classList.add('active');
   document.querySelectorAll(`[data-page="${page}"]`).forEach(b => b.classList.add('active'));
-  const morePages = ['list','resume','schedule-calendar','takeover','templates'];
+  const morePages = ['list','resume','schedule-calendar','takeover','templates','settings'];
   const mnavId = morePages.includes(page) ? 'mnav-more' : 'mnav-' + page.split('-')[0];
   const mnav = document.getElementById(mnavId);
   if (mnav) mnav.classList.add('active');
@@ -35,12 +35,14 @@ function showPage(page, fromHistory = false) {
 
   const content = document.querySelector('.content');
   if (content) content.scrollTop = 0;
+  window.scrollTo(0, 0);   // halaman (bukan .content) yang scroll — kembali ke atas saat pindah menu
 
   if (page === 'dashboard') renderDashboard();
   if (page === 'schedule') renderScheduleList();
   if (page === 'schedule-calendar') renderCalendar();
   if (page === 'list') renderReportList();
   if (page === 'input-pm') renderInputPMPage();
+  if (page === 'settings') loadSettingsPage();
 }
 
 window.addEventListener('popstate', function() {
@@ -106,16 +108,7 @@ function closeMoreSheet() {
 
 function quickStatus(s) { showPage('schedule'); document.getElementById('sch-filter-status').value=s; renderScheduleList(); }
 
-// ── Full lock zoom (cegah pinch & double-tap zoom di semua browser) ──
-(function lockZoom() {
-  document.addEventListener('touchmove', function(e) {
-    if (e.scale !== undefined && e.scale !== 1) e.preventDefault();
-  }, { passive: false });
-  let lastTouchEnd = 0;
-  document.addEventListener('touchend', function(e) {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-  }, { passive: false });
-  document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
-})();
+// Catatan: zoom TIDAK lagi dikunci lewat JS. Double-tap zoom sudah dimatikan oleh CSS
+// (touch-action: manipulation) dan zoom saat fokus input dicegah dengan font-size 16px.
+// Kunci lama (touchend preventDefault < 300 ms) ikut menelan ketukan cepat berurutan
+// pada checkbox/tombol dan menghalangi pinch-zoom untuk aksesibilitas.

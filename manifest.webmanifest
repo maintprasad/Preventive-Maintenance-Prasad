@@ -1,0 +1,25 @@
+{
+  "id": "./",
+  "name": "Prasad Seeds — Preventive Maintenance",
+  "short_name": "PM Prasad",
+  "description": "Jadwal, laporan, dan tindak lanjut Preventive Maintenance PT Prasad Seeds Indonesia — bisa dipakai offline.",
+  "lang": "id",
+  "dir": "ltr",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7f4",
+  "theme_color": "#1a3a6b",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Input PM", "short_name": "Input PM", "description": "Tugas PM minggu ini", "url": "./?page=input-pm&source=shortcut", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Outstanding PM", "short_name": "Outstanding", "description": "PM yang belum dikerjakan", "url": "./?page=outstanding&source=shortcut", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "Schedule PM", "short_name": "Schedule", "description": "Jadwal Preventive Maintenance", "url": "./?page=schedule&source=shortcut", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}
