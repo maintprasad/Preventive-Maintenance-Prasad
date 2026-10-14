@@ -181,7 +181,7 @@ membaca kode.
 | 6 | **RCA** (temuan, akar penyebab, tindakan perbaikan, pencegahan) per item anomali: kotak muncul saat item ditandai "Tidak", tersimpan di `aktivitas[i].rca`, tampil di PDF, dan akar penyebab ikut ke deskripsi WO. Submit dengan RCA belum lengkap meminta konfirmasi | `js/11-form-pm.js`, `js/16-pdf-report.js`, `js/19-wo.js` |
 | 7 | Pesan sync yang jelas bila `/api/db` tidak ditemukan (mis. dibuka lewat XAMPP) | `js/04-sync.js` |
 | 8 | Backend: tabel `master`, aksi `getMaster` / `saveMaster` (digabung union di server), dan `master` di `bulkUpsert` | `api/db.js`, `sql/schema.sql` |
-| 9 | Data PM Cold Storage Unit 2 (3 ruang, Quarterly, 4 laporan Aynur Jun–Sep 2026 dengan RCA) | `tools/seed-coldstorage.js` |
+| 9 | Data PM Cold Storage Unit 2: CS1–CS4 (Quarterly), 12 mesin, 12 laporan Aynur Jun–Sep 2026 lengkap 10 checklist, anomali dengan RCA | `tools/seed-coldstorage.js` |
 | 10 | Uji integrasi API (SQLite in-memory sebagai pengganti Turso) | `tools/test-api.js` |
 
 ## 8. Langkah rilis produksi
@@ -200,9 +200,12 @@ membaca kode.
 
 ## 9. Catatan data seed Cold Storage
 
-- Tiga ruang (Room 1/2/3) dijadwalkan bergantian: start **Juni**, **Juli**, **Agustus**; tiap ruang
-  diulang tiap 3 bulan. PM September adalah siklus berikutnya Room 1 (Juni + 3 bulan).
-- Tag `TAG-CS-01..03` dan nama "Cold Storage Room n" sengaja berbeda dari kompresor yang sudah
-  terdaftar ("Cold Storage 1 Mesin 1–3", TAG-449..451) agar tidak saling menimpa status laporan.
-- Isi laporan (angka pengukuran, temuan, dan RCA) adalah data contoh yang dibuat untuk pengisian
-  awal, bukan hasil pengukuran lapangan. Koreksi lewat **Daftar Laporan → ✏ Edit** bila perlu.
+- Penamaan mengikuti data yang sudah ada: **Cold Storage <n> Mesin <m>**. CS1 Mesin 1–3 memakai tag
+  yang sudah terdaftar (TAG-449..451); tag CS2–CS4 (`CS2-M1` dst.) adalah penanda sementara —
+  ganti lewat Schedule → Edit bila tag aslinya berbeda.
+- Urutan PM: CS1 **Juni**, CS2 **Juli**, CS3 **Agustus**, CS4 **September**; tiap CS diulang tiap
+  3 bulan (CS1 berikutnya September, CS2 Oktober, CS3 November, CS4 Desember). Semua mesin pada
+  CS tersebut dikerjakan lengkap dengan 10 checklist. Jumlah mesin per CS diatur oleh konstanta
+  `MESIN_PER_CS` (saat ini 3, mengikuti CS1).
+- Isi laporan (angka pengukuran, temuan, dan RCA) adalah data contoh untuk pengisian awal, bukan
+  hasil pengukuran lapangan. Koreksi lewat **Daftar Laporan → ✏ Edit** bila perlu.
