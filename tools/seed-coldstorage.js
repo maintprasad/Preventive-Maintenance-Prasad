@@ -19,6 +19,9 @@
  *   node tools/seed-coldstorage.js            → DRY-RUN: validasi lewat normalizer server, tidak mengirim apa pun
  *   PM_URL=https://app-anda.vercel.app PM_APP_KEY=kunci node tools/seed-coldstorage.js --send
  *
+ * PERHATIAN: --send MENIMPA laporan/jadwal dengan id yang sama. Jangan jalankan ulang setelah data diedit manual di aplikasi
+ * (nama, RCA, tanda tangan tidak tersentuh, tetapi isi laporan akan kembali ke versi seed).
+ *
  * Aman diulang: server memakai UPSERT berdasarkan id (yang lebih baru menang), master digabung (union).
  * Data dikirim lewat /api/db (bulkUpsert) sehingga melewati validasi + audit_log yang sama dengan aplikasi.
  */
@@ -105,7 +108,7 @@ const TEMUAN = {
   '1.1': { 3: 'heaterDrain', 8: 'gasket' },
   '2.2': { 4: 'kondensor', 10: 'terminal' },
   '3.3': { 1: 'suhu', 6: 'refrigeran' },
-  '4.1': { 2: 'bearingFan' },
+  // CS4 Mesin 1 (TAG-463): tanpa temuan/RCA — di aplikasi laporan ini sudah dibersihkan (semua YES) dan diberi nama "Mesin 5".
 };
 // Suku cadang yang terpakai pada mesin yang punya temuan
 const SPARE = {
@@ -118,10 +121,6 @@ const SPARE = {
     { uraian: 'Refrigeran', spesifikasi: 'Sesuai jenis pada nameplate unit', jumlah: 2 },
     { uraian: 'Flare nut dan pipa tembaga', spesifikasi: 'Sesuai diameter liquid line', jumlah: 1 },
     { uraian: 'Rubber clamp penyangga pipa', spesifikasi: 'Untuk pipa liquid line', jumlah: 3 },
-  ],
-  '4.1': [
-    { uraian: 'Bearing motor fan evaporator', spesifikasi: 'Sesuai tipe motor (bearing sisi belakang)', jumlah: 1 },
-    { uraian: 'Grease suhu rendah', spesifikasi: 'Low temperature bearing grease', jumlah: 1 },
   ],
 };
 

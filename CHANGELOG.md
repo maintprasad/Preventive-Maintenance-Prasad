@@ -284,3 +284,13 @@ membaca kode.
   Laporan dengan banyak RCA tetap memakai dua halaman, tetapi pemisahnya bersih (tidak ada yang terpotong).
 - Fungsi baru `buildPMBatchHTML(list, sigs, title)` — menggabungkan banyak laporan menjadi satu dokumen cetak (tiap laporan
   mulai di halaman baru); dipakai oleh "Print Semua" di Daftar Laporan.
+
+---
+
+# CS4 Mesin 5: laporan dibersihkan
+
+- Laporan `PM-CS-202609-CS4M1` (di aplikasi bernama "Cold Storage 4 Mesin 5", TAG-463): RCA dihapus, seluruh 12 item **YES**,
+  catatan diubah menjadi "Tidak ada temuan, semua checklist OK." (Turso diperbarui lewat `saveReport`; tanda tangan tidak berubah).
+  Spare part (bearing & grease) belum diubah.
+- `tools/seed-coldstorage.js` diselaraskan (tanpa temuan untuk CS4 Mesin 1) → total RCA data seed menjadi 6; ditambah peringatan
+  bahwa `--send` menimpa laporan dengan id yang sama.
