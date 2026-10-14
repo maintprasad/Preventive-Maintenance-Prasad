@@ -92,13 +92,13 @@ const t = async (name, fn) => { try { await fn(); passed++; console.log('  ✓',
 
   await t('bulkUpsert: laporan beserta RCA tersimpan utuh dan terbaca kembali', async () => {
     const rca = { temuan: 'T', penyebab: 'Why 1 → Why 2', tindakan: 'Diganti', pencegahan: 'Jadwal' };
-    const report = { id: 'PM-CS-TEST', tagNo: 'TAG-CS-01', date: '2026-06-09', equipmentType: 'cold_storage', equipmentName: 'Cold Storage Room 1',
+    const report = { id: 'PM-TEST-RCA', tagNo: 'TAG-CS-01', date: '2026-06-09', equipmentType: 'cold_storage', equipmentName: 'Cold Storage Room 1',
       unit: 'Unit 2', area: 'Cold Storage', periode: 'Quarterly', week: 2, month: 6, teknisi: 'Aynur', approval: '', notes: 'n',
       ppe: { helm: true }, aktivitas: [{ no: 1, uraian: 'u', yes: false, no_checked: true, keterangan: 'k', rca }], spareParts: [],
       submittedAt: '2026-06-09T03:00:00.000Z', updatedAt: '2026-06-09T03:00:00.000Z' };
     const r = await call('bulkUpsert', { reports: [report] });
     assert.equal(r.count, 1); assert.equal(r.rejected, 0);
-    const got = (await call('getReports')).reports.find(x => x.id === 'PM-CS-TEST');
+    const got = (await call('getReports')).reports.find(x => x.id === 'PM-TEST-RCA');
     assert.equal(got.teknisi, 'Aynur');
     assert.deepEqual(JSON.parse(got.aktivitas)[0].rca, rca);
   });
@@ -136,6 +136,11 @@ const t = async (name, fn) => { try { await fn(); passed++; console.log('  ✓',
     await call('saveSchedule', { schedule: { id: 'SCH-410', unit: 'Unit 2', area: 'Cold Storage', equipment: 'Cold Storage 1 Mesin 1', tagNo: 'TAG-449', equipmentType: 'compressor', periode: 'Annual', month: 7, week: 2, notes: 'catatan lama', updatedAt: '2026-07-14T03:20:30.648Z' } });
     const origLog = console.log; console.log = () => {};
     try { await require('./seed-coldstorage.js').main(true); } finally { console.log = origLog; }
+    // Pengaman: menjalankan seed lagi tanpa --force harus ditolak (mencegah laporan ganda / menimpa data yang diedit)
+    const seedMod = require('./seed-coldstorage.js');
+    const poster2 = async body => { const r = await call(body.action, body, body.deviceId); if (r.status !== 200 || !r.success) throw new Error(r.message); return r; };
+    console.log = () => {};
+    try { await assert.rejects(() => seedMod.main(true, poster2), /laporan ganda/); } finally { console.log = origLog; }
     posted.forEach(p => { assert.equal(p.result.success, true); if (p.action === 'bulkUpsert') assert.equal(p.result.rejected, 0); });
     const reps = (await call('getReports')).reports.filter(r => r.id.startsWith('PM-CS-2026'));
     assert.equal(reps.length, 19);

@@ -19,8 +19,8 @@
  *   node tools/seed-coldstorage.js            → DRY-RUN: validasi lewat normalizer server, tidak mengirim apa pun
  *   PM_URL=https://app-anda.vercel.app PM_APP_KEY=kunci node tools/seed-coldstorage.js --send
  *
- * PERHATIAN: --send MENIMPA laporan/jadwal dengan id yang sama. Jangan jalankan ulang setelah data diedit manual di aplikasi
- * (nama, RCA, tanda tangan tidak tersentuh, tetapi isi laporan akan kembali ke versi seed).
+ * PERHATIAN: --send menolak berjalan bila laporan seed (PM-CS-*) sudah ada di database, supaya tidak ada laporan ganda dan
+ * data yang sudah diedit/ditandatangani di aplikasi tidak tertimpa. Gunakan --force hanya bila memang ingin menimpa.
  *
  * Aman diulang: server memakai UPSERT berdasarkan id (yang lebih baru menang), master digabung (union).
  * Data dikirim lewat /api/db (bulkUpsert) sehingga melewati validasi + audit_log yang sama dengan aplikasi.
@@ -233,8 +233,14 @@ function httpPoster() {
   };
 }
 
-async function send(poster) {
+async function send(poster, force = false) {
   const post = poster || httpPoster();
+  // Pengaman: jangan membuat laporan ganda / menimpa laporan yang sudah diedit & ditandatangani di aplikasi.
+  const existingReports = (await post({ action: 'getReports' })).reports || [];
+  const already = existingReports.filter(r => String(r.id).startsWith('PM-CS-'));
+  if (already.length && !force) {
+    throw new Error(`Database sudah berisi ${already.length} laporan seed Cold Storage (PM-CS-*). Dibatalkan agar tidak ada laporan ganda / data yang diedit tertimpa. Jalankan dengan --force bila memang ingin menimpa.`);
+  }
   // Ambil jadwal yang sudah ada supaya mesin Cold Storage diperbarui, bukan diduplikasi.
   const cur = await post({ action: 'getSchedules' });
   const existing = (cur.schedules || []).filter(s => s.area === AREA || machines.some(x => x.tag === s.tagNo));
@@ -256,16 +262,16 @@ async function send(poster) {
   console.log('Selesai. Buka aplikasi → klik ↻ Sync untuk menarik data baru.');
 }
 
-async function main(sendIt, poster) {
+async function main(sendIt, poster, force = false) {
   validate();
   summary();
   if (!sendIt) { console.log('\nDRY-RUN: validasi lolos, tidak ada data dikirim. Tambahkan --send (dan PM_URL / PM_APP_KEY) untuk mengirim.'); return; }
   console.log('');
-  await send(poster);
+  await send(poster, force);
 }
 
 module.exports = { payload, validate, main };
 
 if (require.main === module) {
-  main(process.argv.includes('--send')).catch(e => { console.error('ERROR:', e.message); process.exit(1); });
+  main(process.argv.includes('--send'), undefined, process.argv.includes('--force')).catch(e => { console.error('ERROR:', e.message); process.exit(1); });
 }

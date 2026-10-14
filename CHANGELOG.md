@@ -294,3 +294,13 @@ membaca kode.
   Spare part (bearing & grease) belum diubah.
 - `tools/seed-coldstorage.js` diselaraskan (tanpa temuan untuk CS4 Mesin 1) → total RCA data seed menjadi 6; ditambah peringatan
   bahwa `--send` menimpa laporan dengan id yang sama.
+
+---
+
+# Tanpa laporan ganda
+
+- Laporan seed `PM-CS-202609-CS4M5` (TAG-467, belum ditandatangani) dihapus (soft delete, bisa dipulihkan) karena namanya sama dengan
+  laporan "Cold Storage 4 Mesin 5" (`PM-CS-202609-CS4M1`, TAG-463) yang sudah ditandatangani. Kini hanya ada satu laporan "Mesin 5".
+- `tools/seed-coldstorage.js --send` sekarang **menolak berjalan** bila laporan seed (`PM-CS-*`) sudah ada di database
+  (mencegah laporan ganda dan data yang sudah diedit/ditandatangani tertimpa). Gunakan `--force` hanya bila memang ingin menimpa.
+  Dicakup oleh `tools/test-api.js`.
