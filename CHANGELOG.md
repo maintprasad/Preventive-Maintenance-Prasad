@@ -177,11 +177,11 @@ membaca kode.
 | 2 | Modal baru **Report Ketercapaian** (PDF/Excel): pilih Unit, Area, Format. Laporan memuat rincian per area di bawah tiap unit | `js/17-pdf-schedule.js`, `js/18-excel.js` |
 | 3 | **Kelola Data Master** (tombol "⚙ Kelola Master" di Schedule): tambah Unit, Area di dalam Unit, Equipment (membuka form schedule yang sudah terisi), serta Tipe Equipment baru beserta checklist-nya. Unit/Area kosong tetap muncul di semua pilihan | `js/21-master.js`, `index.html`, `js/09-schedule.js` |
 | 4 | Tipe equipment dinamis: semua dropdown (form PM, schedule, template, filter) dibangun dari `EQ_LABELS`; tipe lama di database tanpa label (mis. `pipe_gas`) kini muncul | `js/21-master.js`, `js/14-templates.js` |
-| 5 | Tipe **Cold Storage** dengan **10 item checklist** PM (suhu/RH, evaporator, defrost, kondensor, kompresor, refrigeran, pintu & gasket, insulasi, kelistrikan/kontrol, alarm & pengaman). Periode: Quarterly (3 bulanan) | `js/00-config.js` |
+| 5 | Tipe **Cold Storage** dengan **10 item checklist** PM *(kemudian diganti 12 item — lihat bagian 12)* (suhu/RH, evaporator, defrost, kondensor, kompresor, refrigeran, pintu & gasket, insulasi, kelistrikan/kontrol, alarm & pengaman). Periode: Quarterly (3 bulanan) | `js/00-config.js` |
 | 6 | **RCA** (temuan, akar penyebab, tindakan perbaikan, pencegahan) per item anomali: kotak muncul saat item ditandai "Tidak", tersimpan di `aktivitas[i].rca`, tampil di PDF, dan akar penyebab ikut ke deskripsi WO. Submit dengan RCA belum lengkap meminta konfirmasi | `js/11-form-pm.js`, `js/16-pdf-report.js`, `js/19-wo.js` |
 | 7 | Pesan sync yang jelas bila `/api/db` tidak ditemukan (mis. dibuka lewat XAMPP) | `js/04-sync.js` |
 | 8 | Backend: tabel `master`, aksi `getMaster` / `saveMaster` (digabung union di server), dan `master` di `bulkUpsert` | `api/db.js`, `sql/schema.sql` |
-| 9 | Data PM Cold Storage Unit 2: CS1–CS4 (Quarterly), 19 mesin, 19 laporan Aynur Jun–Sep 2026 lengkap 10 checklist, anomali dengan RCA | `tools/seed-coldstorage.js` |
+| 9 | Data PM Cold Storage Unit 2: CS1–CS4 (Quarterly), 19 mesin, 19 laporan Aynur Jun–Sep 2026 lengkap 12 checklist (lihat bagian 12), anomali dengan RCA | `tools/seed-coldstorage.js` |
 | 10 | Uji integrasi API (SQLite in-memory sebagai pengganti Turso) | `tools/test-api.js` |
 
 ## 8. Langkah rilis produksi
@@ -207,7 +207,7 @@ membaca kode.
   `cold_storage`, periode **Annual → Quarterly**, bulan start CS1 Juni, CS2 Juli, CS3 Agustus,
   CS4 September (berikutnya +3 bulan). Panel MCC/Antiroom tidak disentuh. Salinan jadwal sebelum
   diubah: `backups/cs-schedules-before-quarterly.json` (tidak di-commit).
-- 19 laporan PM oleh Aynur, 10 checklist per mesin; 7 anomali dilengkapi RCA. Laporan PM kompresor
+- 19 laporan PM oleh Aynur, 12 checklist per mesin, kolom keterangan dikosongkan; 7 anomali dilengkapi RCA. Laporan PM kompresor
   tahunan CS1 Mesin 1–3 (14 Juli) tetap ada.
 - Isi laporan (angka pengukuran, temuan, dan RCA) adalah data contoh untuk pengisian awal, bukan
   hasil pengukuran lapangan. Koreksi lewat **Daftar Laporan → ✏ Edit** bila perlu.
@@ -237,3 +237,19 @@ membaca kode.
 - Data laporan/jadwal disimpan di `localStorage` (bukan di cache service worker), jadi "Hapus Cache Offline"
   tidak menghapus data. Antrian sync tetap terkirim otomatis saat kembali online.
 - iOS: tidak ada prompt resmi — pengguna memasang lewat Bagikan → Tambah ke Layar Utama. Notifikasi push tidak dipakai.
+
+---
+
+# Revisi checklist Cold Storage — 12 item
+
+## 12. Perubahan
+
+- Checklist **Cold Storage** diganti menjadi **12 item**: nomor 1–3 tetap (suhu & RH, evaporator, defrost); item
+  kondensor lama dihapus karena sama dengan kondensor baru; lalu 9 item baru: kondensor, kompresor, kebocoran oli &
+  refrigeran, sistem refrigeran, pintu, panel insulasi & lantai, panel listrik & kontrol (setpoint 12°C), alarm &
+  pengaman, evaluasi kestabilan suhu & RH (target < 40%). Sumber: `PM_TEMPLATES.cold_storage` di `js/00-config.js`.
+- Data PM Cold Storage CS1–CS4 (19 laporan): checklist 12 item, **kolom keterangan dikosongkan**. Nomor item anomali
+  disesuaikan (pintu = 8, kondensor = 4, panel listrik = 10, kebocoran refrigeran = 6) dan teks RCA diselaraskan
+  dengan setpoint 12°C.
+- **Turso**: template `cold_storage` dan 19 laporan diperbarui lewat `node tools/seed-coldstorage.js --send`.
+  Laporan yang sudah tersinkron di perangkat lain otomatis ditimpa versi baru saat sync (updatedAt lebih baru).

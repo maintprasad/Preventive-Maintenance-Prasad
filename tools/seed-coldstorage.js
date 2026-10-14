@@ -7,11 +7,11 @@
  *
  * Isi:
  *   - master  : Unit 2 → area "Cold Storage", tipe equipment "Cold Storage"
- *   - template: 10 item checklist PM Cold Storage (diambil dari js/00-config.js)
+ *   - template: 12 item checklist PM Cold Storage (diambil dari js/00-config.js)
  *   - schedule: jadwal mesin yang SUDAH ADA (dicocokkan lewat Tag No) DIPERBARUI jadi tipe Cold Storage,
  *               periode Quarterly (3 bulanan), bulan start: CS1 Juni, CS2 Juli, CS3 Agustus, CS4 September.
  *               Field lain (id, catatan, createdAt, dll.) dipertahankan. Mesin yang belum punya jadwal dibuat baru.
- *   - laporan : PM lengkap oleh Aynur — seluruh 19 mesin CS1 (Juni) s/d CS4 (September), 10 checklist
+ *   - laporan : PM lengkap oleh Aynur — seluruh 19 mesin CS1 (Juni) s/d CS4 (September), 12 checklist
  *               per mesin. Item yang ditemukan anomali dilengkapi RCA (temuan, akar penyebab,
  *               tindakan, pencegahan).
  *
@@ -31,7 +31,7 @@ const ROOT = path.join(__dirname, '..');
 
 // ── Checklist: satu sumber kebenaran = PM_TEMPLATES.cold_storage di js/00-config.js ──
 const CHECKLIST = vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', '00-config.js'), 'utf8') + '\n;PM_TEMPLATES.cold_storage', {});
-if (!Array.isArray(CHECKLIST) || CHECKLIST.length !== 10) throw new Error('Checklist cold_storage harus 10 item, dapat: ' + (CHECKLIST && CHECKLIST.length));
+if (!Array.isArray(CHECKLIST) || CHECKLIST.length !== 12) throw new Error('Checklist cold_storage harus 12 item, dapat: ' + (CHECKLIST && CHECKLIST.length));
 
 const UNIT = 'Unit 2';
 const AREA = 'Cold Storage';
@@ -81,10 +81,10 @@ const RCA = {
     tindakan: 'Panel di-LOTO, terminal dikencangkan sesuai torsi, kabel yang berubah warna dipotong dan dipasang skun baru; cek suhu terminal dengan infrared 30 menit setelah beroperasi: normal.',
     pencegahan: 'Masukkan pengencangan terminal dan pengukuran suhu terminal (infrared) ke checklist panel setiap PM.',
   }],
-  suhu: ['Setpoint 8°C, aktual 11,4°C, RH 55%', {
-    temuan: 'Suhu aktual ruang 11,4°C pada setpoint 8°C (selisih +3,4°C), RH 55%.',
+  suhu: ['', {
+    temuan: 'Suhu aktual ruang 15,4°C pada setpoint 12°C (selisih +3,4°C), RH 58% (di atas target < 40%).',
     penyebab: 'Why 1: suhu ruang tidak mencapai setpoint → Why 2: kapasitas pendinginan turun → Why 3: charge refrigeran kurang (sight glass bergelembung) → Why 4: ada kebocoran kecil pada flare fitting liquid line → Why 5 (akar): fitting mengendur akibat getaran dan leak test tidak dilakukan berkala.',
-    tindakan: 'Penyebab ditangani lewat perbaikan kebocoran dan pengisian refrigeran (lihat item 6); suhu ruang kembali 8,3°C setelah ±3 jam.',
+    tindakan: 'Penyebab ditangani lewat perbaikan kebocoran dan pengisian refrigeran (lihat item 6); suhu ruang kembali 12,3°C dan RH turun ke 39% setelah ±3 jam stabil.',
     pencegahan: 'Leak test dengan detector setiap PM; pasang penyangga pipa untuk meredam getaran; tren suhu data logger dicek mingguan.',
   }],
   refrigeran: ['Sight glass bergelembung, kebocoran flare fitting liquid line dekat TXV', {
@@ -102,8 +102,8 @@ const RCA = {
 };
 // "cs.mesin": { nomorItem: kunci RCA }
 const TEMUAN = {
-  '1.1': { 3: 'heaterDrain', 7: 'gasket' },
-  '2.2': { 4: 'kondensor', 9: 'terminal' },
+  '1.1': { 3: 'heaterDrain', 8: 'gasket' },
+  '2.2': { 4: 'kondensor', 10: 'terminal' },
   '3.3': { 1: 'suhu', 6: 'refrigeran' },
   '4.1': { 2: 'bearingFan' },
 };
@@ -125,27 +125,6 @@ const SPARE = {
   ],
 };
 
-// Pembacaan ukur yang bervariasi tapi deterministik per mesin (tanpa angka acak).
-const fmt = n => n.toFixed(1).replace('.', ',');
-function normalItem(no, c, m) {
-  const v = (c * 3 + m) % 5;
-  const suhu = 7.9 + v * 0.1, rh = 38 + v, kond = 13.2 + v * 0.1, suc = 1.9 + v * 0.1, dis = kond + 0.1;
-  const arus = [14 + (v % 2), 14 + ((v + 1) % 2), 13 + (v % 3)];
-  switch (no) {
-    case 1: return `Setpoint 8°C, aktual ${fmt(suhu)}°C, RH ${rh}%. Sensor sesuai termometer referensi`;
-    case 2: return 'Coil bersih, es tipis merata, fan evaporator normal, getaran dan suara normal';
-    case 3: return 'Defrost berjalan sesuai jadwal, heater defrost dan drain berfungsi, drain pan kering';
-    case 4: return `Fin kondensor bersih, fan normal, tekanan kondensasi ${fmt(kond)} bar`;
-    case 5: return `Oli di 1/2 sight glass, suction ${fmt(suc)} bar, discharge ${fmt(dis)} bar, arus R/S/T ${arus.join('/')} A, crankcase heater aktif`;
-    case 6: return 'Sight glass jernih, filter drier normal, leak test busa sabun lolos';
-    case 7: return m === 1 ? 'Gasket pintu utuh dan rapat, engsel, door closer, dan heater frame pintu normal'
-                           : `Pintu Cold Storage ${c} diperiksa bersama Mesin 1: kondisi baik, tidak ada celah`;
-    case 8: return 'Panel insulasi utuh, tidak ada kondensasi, lampu ruang normal';
-    case 9: return 'Terminal kencang, kontaktor dan overload normal, controller menampilkan setpoint 8°C';
-    case 10: return 'Alarm suhu tinggi aktif pada 12°C (diuji), HP/LP switch trip sesuai setting, release pintu dari dalam berfungsi, area bersih';
-  }
-}
-
 const machines = [];   // daftar mesin untuk pembentukan jadwal
 const reports = [];
 for (const c of Object.keys(CS).map(Number)) {
@@ -163,7 +142,7 @@ for (const c of Object.keys(CS).map(Number)) {
     const aktivitas = CHECKLIST.map((uraian, i) => {
       const no = i + 1;
       const rcaKey = temuan[no];
-      const a = { no, uraian, yes: !rcaKey, no_checked: !!rcaKey, keterangan: rcaKey ? RCA[rcaKey][0] : normalItem(no, c, m) };
+      const a = { no, uraian, yes: !rcaKey, no_checked: !!rcaKey, keterangan: '' };   // kolom keterangan sengaja dikosongkan (permintaan); isi sendiri bila perlu
       if (rcaKey) a.rca = RCA[rcaKey][1];
       return a;
     });
@@ -177,7 +156,7 @@ for (const c of Object.keys(CS).map(Number)) {
       notes: `PM triwulan ${nameOf(c, m)} (siklus start ${BULAN[cs.month]}); PM berikutnya ${nextMonthOf(cs.month)} 2026. ` +
         (nTemuan ? `${nTemuan} temuan ditangani di tempat (lihat RCA).` : 'Tidak ada temuan, semua checklist OK.'),
       ppe: { helm: true, masker: false, sarungTangan: true, earPlug: false, sepatu: true, harness: false, lain: true },
-      aktivitas, spareParts: SPARE[key] || [], submittedAt: ts, updatedAt: ts,
+      aktivitas, spareParts: SPARE[key] || [], submittedAt: ts, updatedAt: new Date().toISOString(),
     });
   }
 }
@@ -221,7 +200,7 @@ function validate() {
   normMasterData('units', payload.master.units);
   normMasterData('eqtypes', payload.master.eqtypes);
   reports.forEach(r => {
-    if (r.aktivitas.length !== 10) throw new Error(r.id + ': checklist harus 10 item');
+    if (r.aktivitas.length !== CHECKLIST.length) throw new Error(r.id + ': checklist harus ' + CHECKLIST.length + ' item');
     r.aktivitas.forEach(a => {
       if (a.yes === a.no_checked) throw new Error(`${r.id} item ${a.no}: harus tepat satu dari Yes/No`);
       if (a.no_checked && !(a.rca && a.rca.temuan && a.rca.penyebab && a.rca.tindakan && a.rca.pencegahan)) throw new Error(`${r.id} item ${a.no}: RCA belum lengkap`);
@@ -235,7 +214,7 @@ function summary() {
   console.log(`Schedule : ${schedules.length} mesin (Quarterly) — ` + [1, 2, 3, 4].map(c => `CS${c}: ${machines.filter(x => x.c === c).length} mesin bln ${CS[c].month}`).join(', '));
   reports.forEach(r => {
     const an = r.aktivitas.filter(a => a.no_checked).length;
-    console.log(`Laporan  : ${r.date}  ${r.equipmentName}  ${r.teknisi}  checklist ${r.aktivitas.length}/10, anomali+RCA ${an}  (${r.id})`);
+    console.log(`Laporan  : ${r.date}  ${r.equipmentName}  ${r.teknisi}  checklist ${r.aktivitas.length}/${CHECKLIST.length}, anomali+RCA ${an}  (${r.id})`);
   });
 }
 
