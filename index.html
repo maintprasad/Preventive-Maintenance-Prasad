@@ -113,6 +113,7 @@
       <button class="btn-blue" onclick="openDownloadPDFModal()">📥 Download PDF</button>
       <button class="btn-orange" onclick="openCompletionReportModal('pdf')">📊 Report Ketercapaian (PDF)</button>
       <button class="btn-ghost" style="border-color:rgba(74,158,63,.5);color:var(--green2)" onclick="openCompletionReportModal('excel')">📗 Report Ketercapaian (Excel)</button>
+      <button class="btn-ghost" onclick="openMasterModal()" title="Tambah Unit, Area, Equipment, dan Tipe Equipment + checklist">⚙ Kelola Master</button>
       <button class="btn-primary" onclick="openScheduleModal()">+ TAMBAH</button>
     </div>
   </div>
@@ -334,7 +335,7 @@
 <!-- TEMPLATE -->
 <div class="page" id="page-templates">
   <div class="sec-hdr"><div><div class="sec-title">Kelola Template PM</div><div class="sec-sub">Atur item checklist yang muncul saat operator input laporan PM per jenis alat</div></div>
-    <div style="display:flex;gap:8px"><button class="btn-primary" onclick="openAddTemplateItemModal()">+ TAMBAH ITEM</button><button class="btn-ghost" onclick="syncTemplatesFromGAS()">↻ Sync Template</button><button class="btn-ghost" onclick="migrateFromSheets()" title="Sekali saja: salin data dari Google Sheets lama ke Turso">⇪ Migrasi data lama</button></div>
+    <div style="display:flex;gap:8px"><button class="btn-primary" onclick="openAddTemplateItemModal()">+ TAMBAH ITEM</button><button class="btn-ghost" onclick="openMasterModal()" title="Tambah tipe equipment baru beserta checklist-nya">⚙ Tipe Baru</button><button class="btn-ghost" onclick="syncTemplatesFromGAS()">↻ Sync Template</button><button class="btn-ghost" onclick="migrateFromSheets()" title="Sekali saja: salin data dari Google Sheets lama ke Turso">⇪ Migrasi data lama</button></div>
   </div>
   <div class="toolbar">
     <div class="search-wrap"><span style="color:var(--text3)">🔍</span><input type="text" id="tmpl-search" placeholder="Cari equipment atau item checklist..." oninput="renderTemplatePage()"/></div>
@@ -410,8 +411,8 @@
   <div class="modal-body">
     <input type="hidden" id="sch-edit-id">
     <div class="form-grid">
-      <div class="fg"><span class="flabel">Unit *</span><input class="finput" type="text" id="sch-unit" placeholder="Contoh: Processing Unit 1"></div>
-      <div class="fg"><span class="flabel">Area *</span><input class="finput" type="text" id="sch-area" placeholder="Contoh: Dryer Area"></div>
+      <div class="fg"><span class="flabel">Unit *</span><input class="finput" type="text" id="sch-unit" list="sch-unit-list" autocomplete="off" placeholder="Pilih / ketik unit" oninput="refreshUnitAreaDatalists('sch-unit','sch-unit-list','sch-area-list')"><datalist id="sch-unit-list"></datalist></div>
+      <div class="fg"><span class="flabel">Area *</span><input class="finput" type="text" id="sch-area" list="sch-area-list" autocomplete="off" placeholder="Pilih / ketik area (sesuai unit)" onfocus="refreshUnitAreaDatalists('sch-unit','sch-unit-list','sch-area-list')"><datalist id="sch-area-list"></datalist></div>
       <div class="fg"><span class="flabel">Nama Equipment *</span><input class="finput" type="text" id="sch-equipment" placeholder="Nama equipment"></div>
       <div class="fg"><span class="flabel">Tag No</span><input class="finput" type="text" id="sch-tagno" placeholder="TAG-001"></div>
       <div class="fg"><span class="flabel">Equipment Type</span><select class="fsel2" id="sch-eq-type">
@@ -595,6 +596,41 @@
   </div>
 </div></div>
 
+<!-- MODAL: KELOLA DATA MASTER (Unit, Area, Equipment, Tipe Equipment + checklist) -->
+<div class="overlay" id="masterOverlay"><div class="modal modal-lg" style="max-height:92vh;display:flex;flex-direction:column">
+  <div class="modal-hdr" style="flex-shrink:0"><span class="modal-title">⚙ Kelola Data Master</span><button class="modal-close" onclick="closeOverlay('masterOverlay')">×</button></div>
+  <div class="modal-body" style="flex:1;overflow-y:auto">
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-card-title">Struktur Saat Ini (Unit → Area)</div>
+      <div id="mst-tree" style="max-height:200px;overflow-y:auto"></div>
+    </div>
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-card-title">1. Tambah Unit</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><input class="finput" style="flex:1;min-width:200px" type="text" id="mst-unit-name" maxlength="100" placeholder="Nama unit, contoh: Unit 3" onkeydown="if(event.key==='Enter')addMasterUnit()"><button class="btn-primary" onclick="addMasterUnit()">+ Tambah Unit</button></div>
+    </div>
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-card-title">2. Tambah Area di dalam Unit</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><select class="fsel2" style="min-width:160px" id="mst-area-unit"></select><input class="finput" style="flex:1;min-width:180px" type="text" id="mst-area-name" maxlength="100" placeholder="Nama area, contoh: Cold Storage" onkeydown="if(event.key==='Enter')addMasterArea()"><button class="btn-primary" onclick="addMasterArea()">+ Tambah Area</button></div>
+    </div>
+    <div class="section-card" style="margin-bottom:12px">
+      <div class="section-card-title">3. Tambah Equipment di dalam Area</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><select class="fsel2" style="min-width:160px" id="mst-eq-unit" onchange="onMasterEqUnitChange()"></select><select class="fsel2" style="min-width:160px" id="mst-eq-area"></select><button class="btn-primary" onclick="addMasterEquipment()">+ Tambah Equipment →</button></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">Form schedule akan terbuka dengan Unit dan Area sudah terisi; lengkapi nama, tag, tipe, dan periode.</div>
+    </div>
+    <div class="section-card" style="margin-bottom:6px">
+      <div class="section-card-title">4. Tambah Tipe Equipment + Checklist</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input class="finput" type="text" id="mst-type-label" maxlength="60" placeholder="Nama tipe equipment, contoh: Cold Storage">
+        <textarea class="ftextarea" id="mst-type-items" rows="5" placeholder="Item checklist PM — satu item per baris"></textarea>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn-primary" onclick="addMasterEquipmentType()">+ Tambah Tipe &amp; Checklist</button>
+          <button class="btn-ghost" onclick="closeOverlay('masterOverlay');showPage('templates');loadTemplatePage()">🛠 Kelola checklist tipe yang ada →</button></div>
+        <div style="font-size:11px;color:var(--text3)">Tipe terdaftar (jumlah item checklist):</div>
+        <div id="mst-types"></div>
+      </div>
+    </div>
+  </div>
+</div></div>
+
 <!-- MODAL: REPORT KETERCAPAIAN (pilih unit / area / format) -->
 <div class="overlay" id="completionReportOverlay"><div class="modal modal-sm">
   <div class="modal-hdr"><span class="modal-title">📊 Report Ketercapaian PM</span><button class="modal-close" onclick="closeOverlay('completionReportOverlay')">×</button></div>
@@ -631,6 +667,7 @@
 <script src="js/17-pdf-schedule.js"></script>
 <script src="js/18-excel.js"></script>
 <script src="js/19-wo.js"></script>
+<script src="js/21-master.js"></script>
 <script src="js/20-main.js"></script>
 </body>
 </html>

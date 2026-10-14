@@ -76,13 +76,25 @@ akan menyalin schedule, laporan, template dari Google Sheets lama, serta data
 lokal perangkat itu (termasuk tanda tangan) ke Turso. Aman dijalankan ulang dan
 tidak menimbulkan duplikat. Jalankan di perangkat yang paling lengkap datanya.
 
+**Cara C: data awal PM Cold Storage** (Unit 2 → Cold Storage)
+
+```cmd
+node toolsseed-coldstorage.js
+set PM_URL=https://alamat-app-anda.vercel.app
+set PM_APP_KEY=isi-APP_ACCESS_KEY
+node toolsseed-coldstorage.js --send
+```
+
+Tanpa `--send` skrip hanya memvalidasi (dry-run). Data dikirim lewat `/api/db` (`bulkUpsert`),
+jadi melewati validasi dan `audit_log` yang sama dengan aplikasi, dan aman diulang.
+
 ## 4. Pengamanan yang terpasang
 
 | Lapisan | Keterangan |
 |---|---|
 | Token rahasia | Hanya ada di Environment Variable Vercel. Tidak ada di HTML/JS/GitHub. |
 | Kunci akses | `APP_ACCESS_KEY`. Request tanpa kunci ditolak dengan 401. |
-| Whitelist aksi | Hanya sekitar 20 aksi yang dikenal. Tidak ada endpoint "jalankan SQL". |
+| Whitelist aksi | Hanya sekitar 25 aksi yang dikenal. Tidak ada endpoint "jalankan SQL". |
 | Query berparameter | Semua nilai lewat `?` sehingga kebal SQL injection (sudah diuji). |
 | Validasi input | Format id, angka, tanggal, panjang teks, ukuran JSON, dan gambar TTD (PNG saja). |
 | Anti-XSS | `<` `>` `"` di teks diganti `‹` `›` `″`, di server maupun di klien. |

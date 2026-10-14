@@ -5,8 +5,7 @@
 function fillUnitAreaPair(unitId, areaId, unit = '', area = '') {
   const unitSel = document.getElementById(unitId);
   if (!unitSel) return;
-  const schedules = getData(STORE.SCHEDULES);
-  const units = [...new Set(schedules.map(s => s.unit || '').filter(Boolean))].sort();
+  const units = getAllUnits();
   unitSel.innerHTML = '<option value="">Semua Unit</option>' + units.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
   unitSel.value = units.includes(unit) ? unit : '';
   onUnitAreaPairChange(unitId, areaId, area);
@@ -16,8 +15,7 @@ function onUnitAreaPairChange(unitId, areaId, keepArea = '') {
   const unit = document.getElementById(unitId)?.value || '';
   const areaSel = document.getElementById(areaId);
   if (!areaSel) return;
-  const schedules = getData(STORE.SCHEDULES);
-  const areas = [...new Set(schedules.filter(s => !unit || s.unit === unit).map(s => s.area || '').filter(Boolean))].sort();
+  const areas = getAllAreas(unit);
   areaSel.innerHTML = '<option value="">Semua Area</option>' + areas.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
   areaSel.value = areas.includes(keepArea) ? keepArea : '';
   if (unitId === 'dlpdf-unit') updateDownloadPDFCount();

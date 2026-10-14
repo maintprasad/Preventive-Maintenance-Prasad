@@ -83,6 +83,14 @@ CREATE TABLE IF NOT EXISTS templates (
   serverAt      TEXT NOT NULL
   );
 
+CREATE TABLE IF NOT EXISTS master (
+  kind      TEXT PRIMARY KEY,
+  data      TEXT NOT NULL DEFAULT '[]',
+  updatedAt TEXT NOT NULL,
+  updatedBy TEXT,
+  serverAt  TEXT NOT NULL
+  );
+
 CREATE TABLE IF NOT EXISTS locks (
   scheduleId    TEXT PRIMARY KEY,
   equipmentName TEXT NOT NULL DEFAULT '',

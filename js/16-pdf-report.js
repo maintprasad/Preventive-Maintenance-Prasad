@@ -30,6 +30,17 @@ function openPDFOverlay(data, sig = null) {
   openOverlay('pdfOverlay');
 }
 
+// Baris RCA (Root Cause Analysis) di bawah item anomali — hanya bila RCA diisi.
+function _rcaPdfRow(a) {
+  const r = a && a.rca;
+  if (!r || !(r.temuan || r.penyebab || r.tindakan || r.pencegahan)) return '';
+  const line = (label, v) => v ? `<div style="margin-top:2px"><strong>${label}:</strong> ${escapeHtml(v)}</div>` : '';
+  return `<tr><td></td><td colspan="4" style="padding:5px 8px 7px;border:1px solid #ddd;border-left:3px solid #c0392b;background:#fdf3f2;font-size:8.5pt">
+    <div style="font-weight:700;color:#c0392b;font-size:8pt;letter-spacing:.04em">RCA — ANALISIS AKAR MASALAH</div>
+    ${line('Temuan', r.temuan)}${line('Akar penyebab', r.penyebab)}${line('Tindakan perbaikan', r.tindakan)}${line('Pencegahan', r.pencegahan)}
+  </td></tr>`;
+}
+
 function buildPMBodyContent(data, sig = null) {
   if (typeof data.ppe === 'string') { try{data.ppe=JSON.parse(data.ppe);}catch(e){data.ppe={};} }
   if (typeof data.aktivitas === 'string') { try{data.aktivitas=JSON.parse(data.aktivitas);}catch(e){data.aktivitas=[];} }
@@ -43,7 +54,7 @@ function buildPMBodyContent(data, sig = null) {
       <td style="text-align:center;padding:5px 8px;border:1px solid #ddd;font-size:11pt;color:${a.yes?'#155724':'#777'}">${a.yes?'✅':'☐'}</td>
       <td style="text-align:center;padding:5px 8px;border:1px solid #ddd;font-size:11pt;color:${a.no_checked?'#721c24':'#777'}">${a.no_checked?'❌':'☐'}</td>
       <td style="padding:5px 8px;border:1px solid #ddd;font-size:9pt">${a.keterangan||''}</td>
-    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;padding:10px;color:#999;font-size:9pt">—</td></tr>';
+    </tr>${_rcaPdfRow(a)}`).join('') || '<tr><td colspan="5" style="text-align:center;padding:10px;color:#999;font-size:9pt">—</td></tr>';
   const spRows = (Array.isArray(data.spareParts)?data.spareParts:[]).filter(sp=>sp&&sp.uraian).map((sp,i)=>`
     <tr style="background:${i%2===0?'#f9f9f9':'#fff'}">
       <td style="text-align:center;padding:5px 8px;border:1px solid #ddd;font-size:9pt">${i+1}</td>

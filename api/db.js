@@ -125,6 +125,13 @@ const SCHEMA = [
     updatedBy     TEXT,
     serverAt      TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS master (
+    kind      TEXT PRIMARY KEY,
+    data      TEXT NOT NULL DEFAULT '[]',
+    updatedAt TEXT NOT NULL,
+    updatedBy TEXT,
+    serverAt  TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS locks (
     scheduleId    TEXT PRIMARY KEY,
     equipmentName TEXT NOT NULL DEFAULT '',
@@ -156,6 +163,8 @@ const REPORT_COLS = ['id','tagNo','date','equipmentType','equipmentName','unit',
 const SIGNATURE_COLS = ['pmId','tagNo','equipmentName','tanggal','spvName','spvSignature','spvSignedAt',
   'leaderName','leaderSignature','leaderSignedAt','updatedAt','updatedBy','serverAt'];
 const TEMPLATE_COLS = ['equipmentType','items','updatedAt','updatedBy','serverAt'];
+const MASTER_COLS = ['kind','data','updatedAt','updatedBy','serverAt'];
+const MASTER_KINDS = ['units', 'eqtypes'];
 
 // UPSERT dengan penjaga "yang lebih baru menang": baris di server hanya
 // ditimpa kalau updatedAt kiriman >= yang tersimpan, dan record yang sudah
@@ -172,6 +181,9 @@ const SQL = {
   upsertReport:    upsertSql('reports',    REPORT_COLS,    'id',            { softDelete: true }),
   upsertSignature: upsertSql('signatures', SIGNATURE_COLS, 'pmId'),
   upsertTemplate:  upsertSql('templates',  TEMPLATE_COLS,  'equipmentType'),
+  // Master data bersifat tambah-saja dan digabung (union) di server sebelum ditulis,
+  // jadi urutan tulis dari beberapa perangkat tidak boleh menghapus entri.
+  upsertMaster:    upsertSql('master',     MASTER_COLS,    'kind'),
 };
 
 // ════════════════════════════════════════════════════════
@@ -346,6 +358,45 @@ function normTemplate(type, items, ctx) {
   return { equipmentType: t, items: JSON.stringify(clean), updatedAt: ctx.now, updatedBy: ctx.deviceId, serverAt: ctx.now };
 }
 
+// ── Master data: daftar Unit (+ Area di dalamnya) dan Tipe Equipment ──
+//   units   : [{ name, areas: [string] }]
+//   eqtypes : [{ key, label }]   (key = a-z0-9_ , dipakai sebagai equipmentType)
+function normMasterData(kind, data) {
+  if (!MASTER_KINDS.includes(kind)) throw bad('jenis master tidak dikenal');
+  if (!Array.isArray(data)) throw bad('data master harus array');
+  if (kind === 'units') {
+    if (data.length > 400) throw bad('terlalu banyak unit');
+    const map = new Map();
+    data.forEach(u => {
+      const name = text(u && u.name, 100);
+      if (!name) return;
+      const areas = Array.isArray(u.areas) ? u.areas.slice(0, 300).map(a => text(a, 100)).filter(Boolean) : [];
+      const cur = map.get(name) || new Set();
+      areas.forEach(a => cur.add(a));
+      map.set(name, cur);
+    });
+    return [...map].map(([name, set]) => ({ name, areas: [...set].sort() })).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  if (data.length > 200) throw bad('terlalu banyak tipe equipment');
+  const map = new Map();
+  data.forEach(t => {
+    const key = String(t && t.key || '').trim();
+    const label = text(t && t.label, 60);
+    if (!key || !EQTYPE_RE.test(key) || !label) return;
+    if (!map.has(key)) map.set(key, { key, label });
+  });
+  return [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+// Gabungkan data baru ke yang sudah tersimpan di server (union), lalu normalisasi.
+async function mergeMasterRow(kind, incoming, ctx) {
+  const clean = normMasterData(kind, incoming);
+  const cur = await query('SELECT data FROM master WHERE kind = ?', [kind]);
+  let existing = [];
+  if (cur.rows.length) { try { existing = JSON.parse(cur.rows[0].data); } catch { existing = []; } }
+  const merged = normMasterData(kind, [...existing, ...clean]);
+  return { kind, data: JSON.stringify(merged), updatedAt: ctx.now, updatedBy: ctx.deviceId, serverAt: ctx.now };
+}
+
 const argsOf = (obj, cols) => cols.map(c => obj[c]);
 const audit = (ctx, action, recordId) => ({
   sql: 'INSERT INTO audit_log (at, deviceId, ip, action, recordId) VALUES (?, ?, ?, ?, ?)',
@@ -468,6 +519,17 @@ const ACTIONS = {
     await runPipeline([{ sql: SQL.upsertTemplate, args: argsOf(t, TEMPLATE_COLS) }, audit(ctx, 'saveTemplate', t.equipmentType)]);
     return {};
   },
+  async getMaster() {
+    const r = await query('SELECT kind, data FROM master');
+    const master = { units: [], eqtypes: [] };
+    r.rows.forEach(x => { try { if (MASTER_KINDS.includes(x.kind)) master[x.kind] = JSON.parse(x.data); } catch { /* lewati baris rusak */ } });
+    return { master };
+  },
+  async saveMaster(b, ctx) {
+    const row = await mergeMasterRow(String(b.kind || ''), b.data, ctx);
+    await runPipeline([{ sql: SQL.upsertMaster, args: argsOf(row, MASTER_COLS) }, audit(ctx, 'saveMaster', row.kind)]);
+    return {};
+  },
   // Kompatibilitas antrian lama (versi sebelumnya mengirim per item).
   async deleteTemplateItem(b, ctx) {
     const type = String(b.equipmentType || '');
@@ -499,6 +561,14 @@ const ACTIONS = {
       const entries = Object.entries(b.templates);
       if (entries.length > 60) throw bad('terlalu banyak template');
       entries.forEach(([type, items]) => tryAdd(() => ({ sql: SQL.upsertTemplate, args: argsOf(normTemplate(type, items, ctx), TEMPLATE_COLS) })));
+    }
+    if (b.master !== undefined) {
+      if (!b.master || typeof b.master !== 'object' || Array.isArray(b.master)) throw bad('master harus object');
+      for (const kind of MASTER_KINDS) {
+        if (b.master[kind] === undefined) continue;
+        try { stmts.push({ sql: SQL.upsertMaster, args: argsOf(await mergeMasterRow(kind, b.master[kind], ctx), MASTER_COLS) }); }
+        catch (e) { if (e instanceof BadRequest) rejected++; else throw e; }
+      }
     }
     if (stmts.length) await runPipeline([...stmts, audit(ctx, 'bulkUpsert', `${stmts.length} rows`)]);
     return { count: stmts.length, rejected };
@@ -579,4 +649,4 @@ module.exports = async function handler(req, res) {
 };
 
 // Diekspor untuk pengujian lokal (tools/test-api.js)
-module.exports._internal = { SCHEMA, normSchedule, normReport, normSignature, normTemplate, neutralize };
+module.exports._internal = { SCHEMA, normSchedule, normReport, normSignature, normTemplate, normMasterData, neutralize };

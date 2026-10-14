@@ -107,9 +107,10 @@ function _collectAnomaliFromForm() {
   const out = [];
   document.querySelectorAll('#pm-aktivitas-tbody tr').forEach(row => {
     if (!row.querySelector('.pm-no')?.checked) return;
+    const penyebab = row.querySelector('.rca-penyebab')?.value?.trim() || '';
     out.push({
       uraian: row.cells[1]?.textContent?.trim() || '',
-      ket:    row.querySelector('.pm-keterangan')?.value?.trim() || ''
+      ket:    [row.querySelector('.pm-keterangan')?.value?.trim() || '', penyebab && 'Akar penyebab: ' + penyebab].filter(Boolean).join(' | ')
     });
   });
   return out;
@@ -117,7 +118,7 @@ function _collectAnomaliFromForm() {
 function _collectAnomaliFromReport(r) {
   return (r?.aktivitas || [])
     .filter(a => a.no_checked)
-    .map(a => ({ uraian: a.uraian || '', ket: a.keterangan || '' }));
+    .map(a => ({ uraian: a.uraian || '', ket: [a.keterangan || '', a.rca?.penyebab && 'Akar penyebab: ' + a.rca.penyebab].filter(Boolean).join(' | ') }));
 }
 
 function _anomaliListHTML(items, compact) {

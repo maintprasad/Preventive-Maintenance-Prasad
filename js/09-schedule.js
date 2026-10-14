@@ -1,7 +1,8 @@
 // ════════════════════════════════════════════════════════
 //  SCHEDULE CRUD + TREE LIST
 // ════════════════════════════════════════════════════════
-function openScheduleModal(editId = null) {
+// preset = { unit, area } dipakai "Tambah Equipment" dari menu Kelola Data Master.
+function openScheduleModal(editId = null, preset = {}) {
   document.getElementById('sch-edit-id').value = editId || '';
   const now = new Date();
   if (editId) {
@@ -29,7 +30,10 @@ function openScheduleModal(editId = null) {
     document.getElementById('sch-month').value=now.getMonth()+1;
     document.getElementById('sch-week').value=getWeekOfMonth(now);
     document.getElementById('sch-last-done').value='';
+    if (preset.unit) document.getElementById('sch-unit').value = preset.unit;
+    if (preset.area) document.getElementById('sch-area').value = preset.area;
   }
+  refreshUnitAreaDatalists('sch-unit', 'sch-unit-list', 'sch-area-list');
   openOverlay('scheduleOverlay');
 }
 

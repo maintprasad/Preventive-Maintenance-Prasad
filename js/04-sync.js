@@ -84,11 +84,13 @@ async function syncFromSheets(auto = false) {
     await flushSyncQueue();
 
     const cur = auto ? _getCursors() : {};
-    const [schRes, repRes, sigRes] = await Promise.allSettled([
+    const [schRes, repRes, sigRes, masterRes] = await Promise.allSettled([
       api('getSchedules',  { since: cur.schedules  || '' }, 2),
       api('getReports',    { since: cur.reports    || '' }, 2),
-      api('getSignatures', { since: cur.signatures || '' }, 1)
+      api('getSignatures', { since: cur.signatures || '' }, 1),
+      pullMasterFromServer()   // master data (unit/area/tipe equipment) — kecil, tarik penuh tiap sync
     ]);
+    if (masterRes.status === 'rejected') console.warn('[PM] sync master gagal:', masterRes.reason);
     const schOK = schRes.status === 'fulfilled' && schRes.value?.success && Array.isArray(schRes.value.schedules);
     const repOK = repRes.status === 'fulfilled' && repRes.value?.success && Array.isArray(repRes.value.reports);
 

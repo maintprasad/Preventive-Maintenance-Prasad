@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════
 window.addEventListener('load', () => {
   applyLocalTemplates();
+  applyMasterToRuntime();   // tipe equipment tambahan (master data) → EQ_LABELS + semua dropdown
   // Data lama di localStorage (sebelum versi ini) belum dinetralkan — tulis
   // ulang sekali lewat setData() supaya ikut dibersihkan (lihat 02-store.js).
   setData(STORE.REPORTS,   getData(STORE.REPORTS));

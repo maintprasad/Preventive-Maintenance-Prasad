@@ -14,7 +14,7 @@ function applyLocalTemplates() {
   const t = getLocalTemplates();
   Object.keys(t).forEach(k => { if (Array.isArray(t[k]) && t[k].length > 0) PM_TEMPLATES[k] = t[k]; });
 }
-function loadTemplatePage() { applyLocalTemplates(); renderTemplatePage(); }
+function loadTemplatePage() { applyLocalTemplates(); applyMasterToRuntime(); renderTemplatePage(); }
 
 // Kirim daftar checklist LENGKAP satu equipment type (bukan per item) —
 // dulu kegagalan kirim ditelan diam-diam (catch kosong), sekarang masuk antrian.
@@ -22,9 +22,10 @@ function _pushTemplate(eqType, items) {
   if (backendEnabled()) apiOrQueue('saveTemplate', { equipmentType: eqType, items: items || [] }, 'TMPL:' + eqType);
 }
 
-async function syncTemplatesFromGAS() {
-  if (!backendEnabled()) { toast('Buka aplikasi lewat http(s) untuk sync template','warning'); return; }
-  toast('Mengambil template dari database...','info');
+// quiet = true → dipanggil dari auto-sync (tanpa toast, error dilempar ke pemanggil).
+async function syncTemplatesFromGAS(quiet = false) {
+  if (!backendEnabled()) { if (!quiet) toast('Buka aplikasi lewat http(s) untuk sync template','warning'); return; }
+  if (!quiet) toast('Mengambil template dari database...','info');
   try {
     const res = await api('getTemplates');
     if (res.success && res.templates) {
@@ -32,10 +33,14 @@ async function syncTemplatesFromGAS() {
       Object.keys(res.templates).forEach(k => { if (Array.isArray(res.templates[k]) && res.templates[k].length > 0) merged[k] = res.templates[k].map(neutralizeText); });
       saveLocalTemplates(merged);
       applyLocalTemplates();
+      applyMasterToRuntime();   // tipe dari server yang belum punya label (mis. data lama) ikut didaftarkan
       renderTemplatePage();
-      toast('Template berhasil disinkron dari database ✓','success');
+      if (!quiet) toast('Template berhasil disinkron dari database ✓','success');
     }
-  } catch(e) { toast('Gagal sync template','error'); }
+  } catch(e) {
+    if (quiet) throw e;
+    toast('Gagal sync template','error');
+  }
 }
 
 function renderTemplatePage() {

@@ -164,3 +164,45 @@ membaca kode.
 6. `test-wo.js` adalah berkas pengujian, tidak dipakai aplikasi. Boleh
    dihapus dari server produksi, tapi berguna untuk dijalankan ulang
    (`node test-wo.js`) setiap kali modul WO diubah.
+
+---
+
+# Rilis Oktober 2026 — Modal per Unit/Area, Master Data, PM Cold Storage, RCA
+
+## 7. Perubahan
+
+| # | Perubahan | Berkas |
+|---|---|---|
+| 1 | Modal **Download PDF Schedule**: pilih Unit dan Area (jumlah equipment tampil) | `index.html`, `js/17-pdf-schedule.js` |
+| 2 | Modal baru **Report Ketercapaian** (PDF/Excel): pilih Unit, Area, Format. Laporan memuat rincian per area di bawah tiap unit | `js/17-pdf-schedule.js`, `js/18-excel.js` |
+| 3 | **Kelola Data Master** (tombol "⚙ Kelola Master" di Schedule): tambah Unit, Area di dalam Unit, Equipment (membuka form schedule yang sudah terisi), serta Tipe Equipment baru beserta checklist-nya. Unit/Area kosong tetap muncul di semua pilihan | `js/21-master.js`, `index.html`, `js/09-schedule.js` |
+| 4 | Tipe equipment dinamis: semua dropdown (form PM, schedule, template, filter) dibangun dari `EQ_LABELS`; tipe lama di database tanpa label (mis. `pipe_gas`) kini muncul | `js/21-master.js`, `js/14-templates.js` |
+| 5 | Tipe **Cold Storage** dengan **10 item checklist** PM (suhu/RH, evaporator, defrost, kondensor, kompresor, refrigeran, pintu & gasket, insulasi, kelistrikan/kontrol, alarm & pengaman). Periode: Quarterly (3 bulanan) | `js/00-config.js` |
+| 6 | **RCA** (temuan, akar penyebab, tindakan perbaikan, pencegahan) per item anomali: kotak muncul saat item ditandai "Tidak", tersimpan di `aktivitas[i].rca`, tampil di PDF, dan akar penyebab ikut ke deskripsi WO. Submit dengan RCA belum lengkap meminta konfirmasi | `js/11-form-pm.js`, `js/16-pdf-report.js`, `js/19-wo.js` |
+| 7 | Pesan sync yang jelas bila `/api/db` tidak ditemukan (mis. dibuka lewat XAMPP) | `js/04-sync.js` |
+| 8 | Backend: tabel `master`, aksi `getMaster` / `saveMaster` (digabung union di server), dan `master` di `bulkUpsert` | `api/db.js`, `sql/schema.sql` |
+| 9 | Data PM Cold Storage Unit 2 (3 ruang, Quarterly, 4 laporan Aynur Jun–Sep 2026 dengan RCA) | `tools/seed-coldstorage.js` |
+| 10 | Uji integrasi API (SQLite in-memory sebagai pengganti Turso) | `tools/test-api.js` |
+
+## 8. Langkah rilis produksi
+
+1. **Push ke `main`** — Vercel deploy otomatis. Tabel `master` dibuat sendiri oleh `api/db.js`
+   (`CREATE TABLE IF NOT EXISTS`) saat request pertama; tidak ada migrasi manual dan tidak ada
+   perubahan pada tabel yang sudah ada.
+2. **Muat data Cold Storage** (sekali, aman diulang) dari komputer yang punya Node 18+:
+   ```
+   node tools/seed-coldstorage.js                       # dry-run: hanya validasi
+   set PM_URL=https://<alamat-vercel>  &  set PM_APP_KEY=<APP_ACCESS_KEY>
+   node tools/seed-coldstorage.js --send
+   ```
+3. Di aplikasi klik **↻ Sync** — Unit 2 → Cold Storage muncul beserta 3 jadwal dan 4 laporan.
+4. Uji sebelum rilis: `node tools/test-api.js` (butuh Node 22+ karena memakai `node:sqlite`).
+
+## 9. Catatan data seed Cold Storage
+
+- Tiga ruang (Room 1/2/3) dijadwalkan bergantian: start **Juni**, **Juli**, **Agustus**; tiap ruang
+  diulang tiap 3 bulan. PM September adalah siklus berikutnya Room 1 (Juni + 3 bulan).
+- Tag `TAG-CS-01..03` dan nama "Cold Storage Room n" sengaja berbeda dari kompresor yang sudah
+  terdaftar ("Cold Storage 1 Mesin 1–3", TAG-449..451) agar tidak saling menimpa status laporan.
+- Isi laporan (angka pengukuran, temuan, dan RCA) adalah data contoh yang dibuat untuk pengisian
+  awal, bukan hasil pengukuran lapangan. Koreksi lewat **Daftar Laporan → ✏ Edit** bila perlu.

@@ -1,6 +1,23 @@
 // ════════════════════════════════════════════════════════
 //  PM FORM
 // ════════════════════════════════════════════════════════
+// ── RCA (Root Cause Analysis) per item anomali ──────────────
+// Kotak RCA ada di dalam sel keterangan (bukan baris tambahan) supaya semua kode
+// yang menghitung baris checklist (#pm-aktivitas-tbody tr) tetap benar.
+// Tersimpan di aktivitas[i].rca = { temuan, penyebab, tindakan, pencegahan }.
+function _rcaBoxHTML(rca, show) {
+  const r = rca || {};
+  const f = (cls, label, ph, val) => `<label style="display:block;font-size:10px;color:var(--text3);margin-top:4px">${label}
+    <textarea class="ftextarea ${cls}" rows="2" maxlength="600" placeholder="${ph}" style="font-size:12px;margin-top:2px">${escapeHtml(val || '')}</textarea></label>`;
+  return `<div class="rca-box" style="display:${show ? 'block' : 'none'};margin-top:6px;padding:8px 10px;border:1px solid rgba(192,57,43,.3);background:rgba(192,57,43,.05);border-radius:6px">
+    <div style="font-size:10px;font-weight:700;color:var(--red);letter-spacing:.05em">⚠ RCA — ANALISIS AKAR MASALAH</div>
+    ${f('rca-temuan', 'Temuan / masalah *', 'Apa yang ditemukan di lapangan', r.temuan)}
+    ${f('rca-penyebab', 'Akar penyebab (Why 1 → Why 2 → … ) *', 'Mengapa terjadi? Telusuri sampai akar penyebab', r.penyebab)}
+    ${f('rca-tindakan', 'Tindakan perbaikan (korektif) *', 'Apa yang sudah dikerjakan / akan dikerjakan', r.tindakan)}
+    ${f('rca-pencegahan', 'Tindakan pencegahan', 'Agar tidak terulang', r.pencegahan)}
+  </div>`;
+}
+
 function loadPMTemplate() {
   const type = document.getElementById('pm-equipment-type').value;
   const section = document.getElementById('pm-aktivitas-section');
@@ -25,7 +42,7 @@ function loadPMTemplate() {
       <td style="font-size:12px;padding:6px 10px">${escapeHtml(item)}</td>
       <td style="text-align:center;padding:4px"><input type="checkbox" class="pm-yes" name="akt_${i}" onchange="toggleAkt(this,'yes')"></td>
       <td style="text-align:center;padding:4px"><input type="checkbox" class="pm-no" name="akt_${i}" onchange="toggleAkt(this,'no')"></td>
-      <td style="padding:4px"><input type="text" class="aktivitas-ket pm-keterangan" placeholder="Catatan..."></td>
+      <td style="padding:4px"><input type="text" class="aktivitas-ket pm-keterangan" placeholder="Catatan...">${_rcaBoxHTML(null, false)}</td>
     </tr>`).join('');
   const woBar = document.getElementById('wo-summary-bar');
   if (woBar) woBar.style.display = 'none';
@@ -36,6 +53,8 @@ function toggleAkt(cb, val) {
   const row = cb.closest('tr');
   if (val==='yes') row.querySelectorAll('.pm-no').forEach(c=>c.checked=false);
   else row.querySelectorAll('.pm-yes').forEach(c=>c.checked=false);
+  const rcaBox = row.querySelector('.rca-box');
+  if (rcaBox) rcaBox.style.display = row.querySelector('.pm-no')?.checked ? 'block' : 'none';
   _updateWOBar();
   _updateChecklistProgress();
 }
@@ -109,13 +128,19 @@ function collectPMData() {
 
   const aktivitas = [];
   document.querySelectorAll('#pm-aktivitas-tbody tr').forEach((row, i) => {
-    aktivitas.push({
+    const item = {
       no: i+1,
       uraian: row.cells[1]?.textContent?.trim() || '',
       yes: row.querySelector('.pm-yes')?.checked || false,
       no_checked: row.querySelector('.pm-no')?.checked || false,
       keterangan: row.querySelector('.pm-keterangan')?.value || ''
-    });
+    };
+    if (item.no_checked) {
+      const g = cls => (row.querySelector('.' + cls)?.value || '').trim();
+      const rca = { temuan: g('rca-temuan'), penyebab: g('rca-penyebab'), tindakan: g('rca-tindakan'), pencegahan: g('rca-pencegahan') };
+      if (Object.values(rca).some(Boolean)) item.rca = rca;
+    }
+    aktivitas.push(item);
   });
 
   const spareParts = [];
@@ -153,6 +178,10 @@ async function submitPM() {
     toast('Isi field wajib: Tag No, Tanggal, Equipment Name, Teknisi', 'error');
     return;
   }
+
+  // Setiap item anomali ("Tidak") sebaiknya punya RCA: temuan, akar penyebab, tindakan.
+  const rcaKurang = data.aktivitas.filter(a => a.no_checked && !(a.rca && a.rca.temuan && a.rca.penyebab && a.rca.tindakan));
+  if (rcaKurang.length && !confirm(`⚠ ${rcaKurang.length} item anomali belum punya RCA lengkap (temuan, akar penyebab, tindakan perbaikan).\n\nTetap submit tanpa RCA lengkap?`)) return;
 
   const editId = document.getElementById('pm-edit-id')?.value || '';
   const isEdit = !!editId;
@@ -281,14 +310,7 @@ function updateScheduleLastDone(report, scheduleId) {
 // Saran Unit & Area di form laporan: daftar unit dari schedule, daftar area
 // disaring mengikuti unit yang sedang diisi. Input tetap boleh diketik bebas.
 function refreshPMUnitAreaLists() {
-  const schedules = getData(STORE.SCHEDULES);
-  const unit = (document.getElementById('pm-unit')?.value || '').trim();
-  const uniq = arr => [...new Set(arr.filter(Boolean))].sort();
-  const opts = arr => arr.map(v => `<option value="${escapeHtml(v)}">`).join('');
-  const unitList = document.getElementById('pm-unit-list');
-  const areaList = document.getElementById('pm-area-list');
-  if (unitList) unitList.innerHTML = opts(uniq(schedules.map(s => s.unit)));
-  if (areaList) areaList.innerHTML = opts(uniq(schedules.filter(s => !unit || s.unit === unit).map(s => s.area)));
+  refreshUnitAreaDatalists('pm-unit', 'pm-unit-list', 'pm-area-list');
 }
 
 function editReport(id) {
@@ -324,7 +346,7 @@ function editReport(id) {
         <td style="font-size:12px;padding:6px 10px">${escapeHtml(a.uraian)}</td>
         <td style="text-align:center;padding:4px"><input type="checkbox" class="pm-yes" name="akt_${i}" onchange="toggleAkt(this,'yes')" ${a.yes?'checked':''}></td>
         <td style="text-align:center;padding:4px"><input type="checkbox" class="pm-no" name="akt_${i}" onchange="toggleAkt(this,'no')" ${a.no_checked?'checked':''}></td>
-        <td style="padding:4px"><input type="text" class="aktivitas-ket pm-keterangan" placeholder="Catatan..." value="${(a.keterangan||'').replace(/"/g,'&quot;')}"></td>
+        <td style="padding:4px"><input type="text" class="aktivitas-ket pm-keterangan" placeholder="Catatan..." value="${(a.keterangan||'').replace(/"/g,'&quot;')}">${_rcaBoxHTML(a.rca, !!a.no_checked)}</td>
       </tr>`).join('');
   } else {
     loadPMTemplate();
