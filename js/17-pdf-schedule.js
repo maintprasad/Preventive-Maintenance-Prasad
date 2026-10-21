@@ -45,10 +45,11 @@ function openDownloadPDFModal() {
 
 function _getApprovalNames(unitName) {
   const u = (unitName || '').toLowerCase();
-  const disusun = 'Iwan Prasetyo', diperiksa = 'Irawan Krisna Hadi';
+  const diperiksa = 'Irawan Krisna Hadi';
   // Unit Malang: 4 penanda tangan (lihat PM_UNIT_FORMATS) — nama bawaan hanya untuk peran yang punya defaultName
   if (u.includes('malang')) return { unitLabel: 'Unit Malang', boxes: pmUnitFormat('Unit Malang').roles.map(r => ({ title: r.title, sub: r.sub, name: r.defaultName || '' })) };
   const isUnit2 = u.includes('2');
+  const disusun = isUnit2 ? 'M.Aynur Rasyidin' : 'Iwan Prasetyo';   // pembuat jadwal: Unit 1 = Iwan, Unit 2 = Aynur
   return { unitLabel: isUnit2 ? 'Unit - 2' : 'Unit - 1', boxes: [{ title: 'Disusun Oleh', name: disusun }, { title: 'Diperiksa Oleh', name: diperiksa }, { title: 'Disetujui Oleh', name: isUnit2 ? 'Wida Laksono' : 'Willy Triyono' }] };
 }
 
