@@ -7,11 +7,11 @@
  *
  * Isi:
  *   - master  : Unit 2 → area "Cold Storage", tipe equipment "Cold Storage"
- *   - template: 12 item checklist PM Cold Storage (diambil dari js/00-config.js)
+ *   - template: 13 item checklist PM Cold Storage (diambil dari js/00-config.js)
  *   - schedule: jadwal mesin yang SUDAH ADA (dicocokkan lewat Tag No) DIPERBARUI jadi tipe Cold Storage,
  *               periode Quarterly (3 bulanan), bulan start: CS1 Juni, CS2 Juli, CS3 Agustus, CS4 September.
  *               Field lain (id, catatan, createdAt, dll.) dipertahankan. Mesin yang belum punya jadwal dibuat baru.
- *   - laporan : PM lengkap oleh Aynur — seluruh 19 mesin CS1 (Juni) s/d CS4 (September), 12 checklist
+ *   - laporan : PM lengkap oleh Aynur — seluruh 19 mesin CS1 (Juni) s/d CS4 (September), 13 checklist
  *               per mesin. Item yang ditemukan anomali dilengkapi RCA (temuan, akar penyebab,
  *               tindakan, pencegahan).
  *
@@ -34,7 +34,7 @@ const ROOT = path.join(__dirname, '..');
 
 // ── Checklist: satu sumber kebenaran = PM_TEMPLATES.cold_storage di js/00-config.js ──
 const CHECKLIST = vm.runInNewContext(fs.readFileSync(path.join(ROOT, 'js', '00-config.js'), 'utf8') + '\n;PM_TEMPLATES.cold_storage', {});
-if (!Array.isArray(CHECKLIST) || CHECKLIST.length !== 12) throw new Error('Checklist cold_storage harus 12 item, dapat: ' + (CHECKLIST && CHECKLIST.length));
+if (!Array.isArray(CHECKLIST) || CHECKLIST.length !== 13) throw new Error('Checklist cold_storage harus 13 item (12 + cover mesin), dapat: ' + (CHECKLIST && CHECKLIST.length));
 
 const UNIT = 'Unit 2';
 const AREA = 'Cold Storage';
