@@ -54,17 +54,7 @@ function _renderMonthPills(year) {
 
   const monthStats = {};
   for (let m = 1; m <= 12; m++) {
-    const schThisMonth = schedules.filter(s => {
-      const sMonth = parseInt(s.month) || 0;
-      if (!sMonth) return false;
-      if (s.periode === 'Monthly') return sMonth === m;
-      if (s.periode === 'Weekly')  return true;
-      if (s.periode === 'Daily')   return true;
-      if (s.periode === 'Quarterly')   return ((m - sMonth) % 3 === 0) && m >= sMonth;
-      if (s.periode === 'Semi-Annual') return ((m - sMonth) % 6 === 0) && m >= sMonth;
-      if (s.periode === 'Annual')      return sMonth === m;
-      return sMonth === m;
-    });
+    const schThisMonth = schedules.filter(s => isPlannedInMonth(s, year, m));
     let done = 0, overdue = 0, upcoming = 0;
     schThisMonth.forEach(s => {
       const rep = _checkHasReport(s, m, year, reports);
@@ -147,17 +137,8 @@ function renderCalMonthView() {
   if (sub) sub.textContent = `${MONTHS_ID[month-1]} ${year} — Gantt Mingguan`;
 
   let scheduled = allSchedules.filter(s => {
-    const sMonth = parseInt(s.month) || 0;
-    if (!sMonth) return false;
-    let inMonth = false;
-    if (s.periode === 'Monthly')     inMonth = sMonth === month;
-    else if (s.periode === 'Weekly') inMonth = true;
-    else if (s.periode === 'Daily')  inMonth = true;
-    else if (s.periode === 'Quarterly')   inMonth = ((month - sMonth) % 3 === 0) && month >= sMonth;
-    else if (s.periode === 'Semi-Annual') inMonth = ((month - sMonth) % 6 === 0) && month >= sMonth;
-    else if (s.periode === 'Annual')      inMonth = sMonth === month;
-    else inMonth = sMonth === month;
-    if (!inMonth) return false;
+    // Rencana tanggal (plan) menang atas pola lama bulan + minggu + periode (lihat 23-plan.js)
+    if (!isPlannedInMonth(s, year, month)) return false;
     if (unitF && s.unit !== unitF) return false;
     if (areaF && s.area !== areaF) return false;
     return true;
@@ -245,10 +226,10 @@ function renderCalMonthView() {
     Object.entries(areas).sort(([a],[b])=>a.localeCompare(b)).forEach(([area, items]) => {
       html += `<tr class="gantt-group-row"><td colspan="${weeks.length+1}" style="padding-left:26px !important;color:var(--text2);font-size:11px">📍 ${area}</td></tr>`;
       items.forEach(s => {
-        const sWeek = parseInt(s.week) || 1;
+        const plannedW = plannedWeeksInMonth(s, year, month);
         html += `<tr><td class="gantt-eq-cell"><div class="gantt-eq-name">${s.equipment}</div><div class="gantt-eq-sub">${s.periode}${s.tagNo?' · '+s.tagNo:''}</div></td>
           ${weeks.map(w => {
-            if (w !== sWeek) return `<td class="gantt-week-cell"><span class="gantt-dot-empty"></span></td>`;
+            if (!plannedW.includes(w)) return `<td class="gantt-week-cell"><span class="gantt-dot-empty"></span></td>`;
             const icon = s._status === 'done' ? '✓' : s._status === 'overdue' ? '!' : '◎';
             return `<td class="gantt-week-cell"><span class="gantt-pill ${s._status}" onclick="openGanttPopup('${s.id}')">${icon}</span></td>`;
           }).join('')}
@@ -261,6 +242,15 @@ function renderCalMonthView() {
   container.innerHTML = html;
 }
 
+// Teks rencana pada bulan yang sedang dilihat: tanggal (bila rencana per tanggal) atau minggu (pola lama)
+function _ganttPlanText(s) {
+  const y = _calSelectedYear, m = _calSelectedMonth;
+  if (y && m && hasExplicitPlan(s, y)) {
+    const days = getPlanDates(s, y).filter(iso => Number(iso.slice(5, 7)) === m).map(iso => Number(iso.slice(8)));
+    return days.length ? `Tanggal ${days.join(', ')} ${MONTHS_ID[m - 1]}` : 'Tanggal —';
+  }
+  return `Minggu ${s.week || '?'}`;
+}
 function openGanttPopup(scheduleId) {
   const s = (window._ganttData || {})[scheduleId];
   if (!s) return;
@@ -280,7 +270,7 @@ function openGanttPopup(scheduleId) {
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;font-size:12.5px;color:var(--text2)">
       <div>🏭 <strong>${s.unit||'—'}</strong> &nbsp;·&nbsp; 📍 ${s.area||'—'}</div>
-      <div>🔄 Periode: <strong>${s.periode}</strong> &nbsp;·&nbsp; Minggu ${s.week||'?'}</div>
+      <div>🔄 Periode: <strong>${s.periode}</strong> &nbsp;·&nbsp; ${_ganttPlanText(s)}</div>
       ${s.tagNo ? `<div>🏷 Tag: <strong>${s.tagNo}</strong></div>` : ''}
       ${s.pic ? `<div>👤 PIC: <strong>${s.pic}</strong></div>` : ''}
       ${reportDate ? `<div style="color:var(--green2)">✓ PM dilakukan: ${reportDate}</div>` : ''}
@@ -290,7 +280,8 @@ function openGanttPopup(scheduleId) {
         ? (isLockedByOther(s.id)
             ? `<button class="btn-ghost" style="flex:1;font-size:12px;padding:9px 14px" disabled>🔒 Sedang Dikerjakan</button>`
             : `<button class="btn-primary" style="flex:1;font-size:12px;padding:9px 14px" onclick="closeGanttPopup();eksekusiPM('${s.id}')">▶ Eksekusi PM</button>`)
-        : s._report ? `<button class="btn-blue" style="flex:1;font-size:12px;padding:9px 14px" onclick="closeGanttPopup();downloadPMPDFById('${s._report.id}')">📄 Lihat PDF</button>` : ''}
+        : (s._report ? `<button class="btn-blue" style="flex:1;font-size:12px;padding:9px 14px" onclick="closeGanttPopup();downloadPMPDFById('${s._report.id}')">📄 Lihat PDF</button>` : '')
+          + (isLockedByOther(s.id) ? '' : `<button class="btn-primary" style="flex:1;font-size:12px;padding:9px 14px" onclick="closeGanttPopup();eksekusiPM('${s.id}')">↻ PM Lagi</button>`)}
       <button class="btn-ghost" style="font-size:12px;padding:9px 14px" onclick="closeGanttPopup()">Tutup</button>
     </div>`;
   document.getElementById('ganttPopupOverlay').classList.add('open');

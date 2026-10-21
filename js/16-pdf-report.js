@@ -35,6 +35,7 @@ function openPDFOverlay(data, sig = null) {
 const PM_PRINT_CSS = '*{box-sizing:border-box;margin:0;padding:0}@page{size:A4 portrait;margin:12mm 14mm}body{font-family:Arial,Helvetica,sans-serif;font-size:10pt;color:#111;background:#fff}table{width:100%;border-collapse:collapse}.il{background:#eef3ee;padding:5px 10px;font-weight:600;font-size:8.5pt;width:110px;color:#1a3a6b;border:1px solid #ccc}.iv{padding:5px 10px;font-size:9pt;border:1px solid #ccc}.st{background:#1a3a6b;color:#fff;padding:6px 12px;font-size:9pt;font-weight:700;letter-spacing:.05em;text-transform:uppercase;margin-top:10px;break-after:avoid;page-break-after:avoid}.th{background:#1a3a6b;color:rgba(255,255,255,.85);padding:6px 8px;font-size:8pt;letter-spacing:.04em;text-transform:uppercase;border:1px solid #2a4a7b}.sc{padding:10px 12px;border:1px solid #ccc;text-align:center;width:33.3%}.ft{margin-top:8px;padding:4px 0;font-size:7.5pt;color:#999;border-top:1px solid #eee;text-align:center}'
   + 'tr,tbody.it,.blk{break-inside:avoid;page-break-inside:avoid}thead{display:table-header-group}.pm-doc{break-after:page;page-break-after:always}.pm-doc:last-child{break-after:auto;page-break-after:auto}'
   // Saat dicetak sedikit dipadatkan supaya laporan 12 item (tanpa RCA) muat SATU halaman A4; layar/preview tidak berubah.
+  + '.phgrid{display:flex;flex-wrap:wrap;gap:6px;border:2px solid #1a3a6b;border-top:none;padding:6px}.phfig{width:calc(50% - 3px);break-inside:avoid;page-break-inside:avoid}.phfig img{width:100%;max-height:68mm;object-fit:contain;background:#f4f4f4;display:block}.phfig figcaption{font-size:8pt;color:#555;min-height:10px;padding-top:2px}'
   + '@media print{@page{margin:9mm 12mm}.il,.iv{padding:2px 8px}.it td{padding:1px 8px !important}.st{padding:4px 12px;margin-top:6px}.sc{padding:6px 10px}.sc div[style*="height:58px"]{height:28px !important}.sc img{height:40px !important;margin:2px auto !important}.it td[colspan]{font-size:8pt !important;padding:3px 8px 4px !important}.it td[colspan] div{margin-top:1px !important}.st{margin-top:5px;padding:3px 12px}.th{padding:3px 8px}.ft{margin-top:4px}.blk > table td[style*="padding:7px 10px"]{padding:4px 10px !important}}';
 
 // Baris RCA (Root Cause Analysis) di bawah item anomali — hanya bila RCA diisi.
@@ -52,6 +53,10 @@ function buildPMBodyContent(data, sig = null) {
   if (typeof data.ppe === 'string') { try{data.ppe=JSON.parse(data.ppe);}catch(e){data.ppe={};} }
   if (typeof data.aktivitas === 'string') { try{data.aktivitas=JSON.parse(data.aktivitas);}catch(e){data.aktivitas=[];} }
   if (typeof data.spareParts === 'string') { try{data.spareParts=JSON.parse(data.spareParts);}catch(e){data.spareParts=[];} }
+  if (typeof data.photos === 'string') { try{data.photos=JSON.parse(data.photos);}catch(e){data.photos=[];} }
+  const photos = (Array.isArray(data.photos) ? data.photos : []).filter(p => p && (typeof _photoUrlOk === 'function' ? _photoUrlOk(p.url) : /^https:\/\//.test(p.url || '')));
+  const pmNoLbl = data.pmNo || ((typeof pmNoOf === 'function' && data.id && !String(data.id).startsWith('PREVIEW')) ? pmNoOf(data) : '');
+  const photoHTML = photos.length ? `<div class="st">Foto Dokumentasi</div><div class="phgrid">${photos.map(p => `<figure class="phfig"><img src="${escapeHtml(p.url)}" alt="Foto equipment"><figcaption>${escapeHtml(p.caption || '')}</figcaption></figure>`).join('')}</div>` : '';
   const ppeMap = {helm:'Helm',masker:'Masker',sarungTangan:'Sarung Tangan',earPlug:'Ear Plug',sepatu:'Sepatu Safety',harness:'Harness',lain:'PPE Lain'};
   const ppeList = Object.entries(data.ppe||{}).filter(([,v])=>v).map(([k])=>ppeMap[k]||k).join(', ') || '—';
   const aktivitasRows = (data.aktivitas||[]).map((a,i)=>`
@@ -76,34 +81,18 @@ function buildPMBodyContent(data, sig = null) {
   const ldSigCell  = sig?.leaderSig ? `<img src="${sig.leaderSig}" style="height:58px;max-width:170px;display:block;margin:4px auto">` : '<div style="height:58px;border-bottom:1px solid #bbb;margin:4px 14px"></div>';
   const spvDate = sig?.spvAt ? new Date(sig.spvAt).toLocaleDateString('id-ID') : '_______________';
   const ldDate  = sig?.leaderAt ? new Date(sig.leaderAt).toLocaleDateString('id-ID') : '_______________';
-  return `
-<table style="border:2px solid #1a3a6b;margin-bottom:0"><tr>
-  <td style="width:68px;padding:8px 10px;border-right:2px solid #1a3a6b;vertical-align:middle"><div style="width:52px;height:38px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:7pt;color:#aaa">LOGO</div></td>
-  <td style="text-align:center;padding:8px;border-right:2px solid #1a3a6b;vertical-align:middle"><div style="font-size:13pt;font-weight:900;color:#1a3a6b">PREVENTIVE MAINTENANCE REPORT</div><div style="font-size:8pt;color:#666;margin-top:2px">PT PRASAD SEEDS INDONESIA</div></td>
-  <td style="width:136px;padding:8px 10px;font-size:7.5pt;color:#666;text-align:right;vertical-align:top"><div>Form: F-MTC-PM-01</div><div>Rev: 00</div><div style="margin-top:4px">Dicetak: ${printDate}</div></td>
-</tr></table>
-<table style="border:2px solid #1a3a6b;border-top:none">
-  <tr><td class="il">Tag No</td><td class="iv">${data.tagNo||'—'}</td><td class="il">Tanggal</td><td class="iv">${formattedDate}</td></tr>
-  <tr><td class="il">Unit</td><td class="iv">${data.unit||'—'}</td><td class="il">Area</td><td class="iv">${data.area||'—'}</td></tr>
-  <tr><td class="il">Equipment Type</td><td class="iv">${typeLabel}</td><td class="il">Equipment Name</td><td class="iv">${data.equipmentName||'—'}</td></tr>
-  <tr><td class="il">Periode</td><td class="iv">${data.periode||'—'}</td><td class="il">Minggu Ke</td><td class="iv">${data.week||'—'}</td></tr>
-</table>
-<div class="blk"><div class="st">P.P.E — Peralatan Keselamatan Kerja</div>
-<table style="border:2px solid #1a3a6b;border-top:none"><tr><td style="padding:7px 10px;font-size:9pt">${ppeList}</td></tr></table></div>
-<div class="st">Aktivitas Checklist</div>
-<table style="border:2px solid #1a3a6b;border-top:none">
-  <thead><tr><th class="th" style="width:30px">NO</th><th class="th" style="text-align:left">URAIAN AKTIVITAS</th><th class="th" style="width:46px">YES</th><th class="th" style="width:46px">NO</th><th class="th" style="width:160px;text-align:left">KETERANGAN</th></tr></thead>
-  ${aktivitasRows}
-</table>
-<div class="blk"><div class="st">Spare Parts / Material Yang Digunakan</div>
-<table style="border:2px solid #1a3a6b;border-top:none">
-  <thead><tr><th class="th" style="width:30px">NO</th><th class="th" style="text-align:left">URAIAN</th><th class="th" style="text-align:left">SPESIFIKASI</th><th class="th" style="width:60px">JUMLAH</th></tr></thead>
-  <tbody>${spRows}</tbody>
-</table></div>
-<div class="blk"><div class="st">Catatan Tambahan</div>
-<table style="border:2px solid #1a3a6b;border-top:none"><tr><td style="padding:7px 10px;min-height:34px;font-size:9pt">${data.notes||'—'}</td></tr></table></div>
-<div class="blk"><div class="st">Pengesahan</div>
-<table style="border:2px solid #1a3a6b;border-top:none"><tr>
+  // Pengesahan: format standar (3 kolom) atau format khusus unit (PM_UNIT_FORMATS — mis. Unit Malang: 4 kolom Execute/Checked/Review/Approved)
+  const unitFmt = typeof pmUnitFormat === 'function' ? pmUnitFormat(data.unit) : null;
+  const pengesahanHTML = unitFmt ? `<table style="border:2px solid #1a3a6b;border-top:none"><tr>${unitFmt.roles.map(ro => {
+    const x = (sig && sig.signers && sig.signers[ro.key]) || {};
+    const nm = x.name || (ro.key === 'execute' ? (data.teknisi || '') : '') || ro.defaultName || '';
+    const imgCell = x.sig ? `<img src="${x.sig}" style="height:58px;max-width:100%;display:block;margin:4px auto">`
+      : (ro.key === 'execute'
+          ? `<div style="height:58px;border-bottom:1px solid #bbb;margin:4px 10px;display:flex;align-items:flex-end;justify-content:center;font-size:9pt;padding-bottom:2px">${escapeHtml(data.teknisi || '')}</div>`
+          : '<div style="height:58px;border-bottom:1px solid #bbb;margin:4px 10px"></div>');
+    const dt = x.at ? new Date(x.at).toLocaleDateString('id-ID') : (ro.key === 'execute' ? formattedDate : '_______________');
+    return `<td class="sc" style="width:25%"><div style="font-weight:bold;font-size:8.5pt">${ro.title}<br><span style="font-weight:normal;font-size:8pt">(${ro.sub})</span></div>${imgCell}<div style="font-size:8pt;font-weight:600;margin-top:6px">${nm ? escapeHtml(nm) : '_______________'}</div><div style="font-size:7.5pt;color:#666;margin-top:3px">Tgl: ${dt}</div></td>`;
+  }).join('')}</tr></table>` : `<table style="border:2px solid #1a3a6b;border-top:none"><tr>
   <td class="sc">
     <div style="font-weight:bold;font-size:8.5pt">Dibuat Oleh<br><span style="font-weight:normal;font-size:8pt">Teknisi Pelaksana</span></div>
     <div style="height:58px;border-bottom:1px solid #bbb;margin:4px 14px;display:flex;align-items:flex-end;justify-content:center;font-size:9pt;padding-bottom:2px">${data.teknisi||''}</div>
@@ -122,7 +111,36 @@ function buildPMBodyContent(data, sig = null) {
     <div style="font-size:8pt;font-weight:600;margin-top:6px">${sig?.leaderName||'_______________'}</div>
     <div style="font-size:7.5pt;color:#666;margin-top:3px">Tgl: ${ldDate}</div>
   </td>
+</tr></table></tr></table>`;
+  return `
+<table style="border:2px solid #1a3a6b;margin-bottom:0"><tr>
+  <td style="width:68px;padding:8px 10px;border-right:2px solid #1a3a6b;vertical-align:middle"><div style="width:52px;height:38px;border:1px solid #ccc;display:flex;align-items:center;justify-content:center;font-size:7pt;color:#aaa">LOGO</div></td>
+  <td style="text-align:center;padding:8px;border-right:2px solid #1a3a6b;vertical-align:middle"><div style="font-size:13pt;font-weight:900;color:#1a3a6b">PREVENTIVE MAINTENANCE REPORT</div><div style="font-size:8pt;color:#666;margin-top:2px">PT PRASAD SEEDS INDONESIA</div></td>
+  <td style="width:136px;padding:8px 10px;font-size:7.5pt;color:#666;text-align:right;vertical-align:top"><div>Form: F-MTC-PM-01</div><div>Rev: 00</div><div style="margin-top:4px">Dicetak: ${printDate}</div></td>
 </tr></table>
+<table style="border:2px solid #1a3a6b;border-top:none">
+  <tr><td class="il">Tag No</td><td class="iv">${data.tagNo||'—'}</td><td class="il">Tanggal</td><td class="iv">${formattedDate}</td></tr>
+  <tr><td class="il">Unit</td><td class="iv">${data.unit||'—'}</td><td class="il">Area</td><td class="iv">${data.area||'—'}</td></tr>
+  <tr><td class="il">Equipment Type</td><td class="iv">${typeLabel}</td><td class="il">Equipment Name</td><td class="iv">${data.equipmentName||'—'}</td></tr>
+  <tr><td class="il">Periode</td><td class="iv">${data.periode||'—'}</td><td class="il">Minggu / PM Ke</td><td class="iv">${data.week||'—'}${pmNoLbl ? ' &nbsp;·&nbsp; <b>PM ke-' + pmNoLbl + '</b>' : ''}</td></tr>
+</table>
+<div class="blk"><div class="st">P.P.E — Peralatan Keselamatan Kerja</div>
+<table style="border:2px solid #1a3a6b;border-top:none"><tr><td style="padding:7px 10px;font-size:9pt">${ppeList}</td></tr></table></div>
+<div class="st">Aktivitas Checklist</div>
+<table style="border:2px solid #1a3a6b;border-top:none">
+  <thead><tr><th class="th" style="width:30px">NO</th><th class="th" style="text-align:left">URAIAN AKTIVITAS</th><th class="th" style="width:46px">YES</th><th class="th" style="width:46px">NO</th><th class="th" style="width:160px;text-align:left">KETERANGAN</th></tr></thead>
+  ${aktivitasRows}
+</table>
+<div class="blk"><div class="st">Spare Parts / Material Yang Digunakan</div>
+<table style="border:2px solid #1a3a6b;border-top:none">
+  <thead><tr><th class="th" style="width:30px">NO</th><th class="th" style="text-align:left">URAIAN</th><th class="th" style="text-align:left">SPESIFIKASI</th><th class="th" style="width:60px">JUMLAH</th></tr></thead>
+  <tbody>${spRows}</tbody>
+</table></div>
+<div class="blk"><div class="st">Catatan Tambahan</div>
+<table style="border:2px solid #1a3a6b;border-top:none"><tr><td style="padding:7px 10px;min-height:34px;font-size:9pt">${data.notes||'—'}</td></tr></table></div>
+${photoHTML}
+<div class="blk"><div class="st">Pengesahan</div>
+${pengesahanHTML}
 <div class="ft">Report ID: ${data.id||'—'} | PM Dashboard — PT Prasad Seeds Indonesia | Dicetak: ${printDate}</div></div>`;
 }
 

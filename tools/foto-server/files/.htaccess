@@ -1,0 +1,16 @@
+# Folder foto: JANGAN ada skrip yang bisa dieksekusi di sini (foto hanya gambar statis).
+Options -Indexes -ExecCGI
+<IfModule mod_php.c>
+  php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+  php_flag engine off
+</IfModule>
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .phps .phar
+<FilesMatch "\.(php|phtml|phar|pl|py|cgi|sh|html?)$">
+  Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set Content-Security-Policy "default-src 'none'; img-src 'self'; sandbox"
+</IfModule>

@@ -62,13 +62,14 @@ function pushMaster(kind) {
 
 // ── Daftar gabungan (master + yang sudah dipakai schedule/laporan) ──
 function getAllUnits() {
-  const set = new Set(getMaster().units.map(u => u.name));
+  const set = new Set([...PM_UNITS, ...getMaster().units.map(u => u.name)]);
   getData(STORE.SCHEDULES).forEach(s => { if (s.unit) set.add(s.unit); });
-  return [...set].filter(Boolean).sort();
+  // Unit resmi (PM_UNITS) tampil lebih dulu sesuai urutannya, sisanya urut abjad
+  return [...set].filter(Boolean).sort((a, b) => { const ia = PM_UNITS.indexOf(a), ib = PM_UNITS.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
 }
 function getAllAreas(unit = '') {
   const set = new Set();
-  getMaster().units.filter(u => !unit || u.name === unit).forEach(u => u.areas.forEach(a => set.add(a)));
+  getMaster().units.filter(u => !unit || u.name === unit).forEach(u => u.areas.forEach(a => set.add(a)));   // Unit tanpa area: daftar area kosong
   getData(STORE.SCHEDULES).filter(s => !unit || s.unit === unit).forEach(s => { if (s.area) set.add(s.area); });
   return [...set].filter(Boolean).sort();
 }

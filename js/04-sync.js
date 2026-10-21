@@ -97,7 +97,8 @@ async function syncFromSheets(auto = false) {
     const pendingIds = getPendingRecordIds();
 
     if (schOK) {
-      const merged = mergeById(getData(STORE.SCHEDULES), schRes.value.schedules, pendingIds, schRes.value.deleted);
+      // plan datang sebagai string JSON dari server → jadikan object SEBELUM digabung (setData menetralkan tanda kutip)
+      const merged = mergeById(getData(STORE.SCHEDULES), schRes.value.schedules.map(_sanitizeSchedule), pendingIds, schRes.value.deleted);
       setData(STORE.SCHEDULES, merged);
       _setCursor('schedules', schRes.value.cursor);
     }
@@ -215,6 +216,7 @@ async function migrateFromSheets() {
     const sigs = Object.entries(getLocalSigs()).filter(([id]) => isSafeId(id)).map(([pmId, s]) => ({
       pmId, spvName: s.spvName || '', spvSignature: s.spvSig || '', spvSignedAt: s.spvAt || '',
       leaderName: s.leaderName || '', leaderSignature: s.leaderSig || '', leaderSignedAt: s.leaderAt || '',
+      signers: s.signers || undefined,
       updatedAt: s.updatedAt || ''
     }));
     const templates = { ...getLocalTemplates(), ...gasTmpl };

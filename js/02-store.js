@@ -12,6 +12,7 @@ let _reportIndexCache = null;  // Set: key untuk hasReport lookup
 function _invalidateCache() {
   _statusCache = null;
   _reportIndexCache = null;
+  if (typeof _pmResetCache === 'function') _pmResetCache();   // cache hitung PM (25-pmno.js)
 }
 
 function _sanitizeReport(item) {
@@ -22,7 +23,26 @@ function _sanitizeReport(item) {
   if (!Array.isArray(item.aktivitas)) item.aktivitas = [];
   item.spareParts = _safeParseJSON(item.spareParts, []);
   if (!Array.isArray(item.spareParts)) item.spareParts = [];
+  item.photos = _safeParseJSON(item.photos, []);
+  if (!Array.isArray(item.photos)) item.photos = [];
+  const pn = parseInt(item.pmNo, 10);
+  item.pmNo = pn > 0 ? pn : null;
   return item;
+}
+
+// Jadwal: plan (rencana tanggal per tahun) bisa datang sebagai string JSON dari server → jadikan object.
+// Bila ada rencana untuk TAHUN BERJALAN, month/week diturunkan dari tanggal pertamanya supaya semua halaman
+// lama (status, Input PM, Outstanding, Takeover, Kalender) otomatis memakai rencana tahun ini.
+function _sanitizeSchedule(s) {
+  if (!s) return s;
+  if (typeof s.plan === 'string') s.plan = _safeParseJSON(s.plan, {});
+  if (!s.plan || typeof s.plan !== 'object' || Array.isArray(s.plan)) s.plan = {};
+  const arr = s.plan[String(new Date().getFullYear())];
+  if (Array.isArray(arr) && arr.length) {
+    const d = new Date(arr[0] + 'T00:00:00');
+    if (!isNaN(d.getTime())) { s.month = d.getMonth() + 1; s.week = getWeekOfMonth(d); }
+  }
+  return s;
 }
 
 // FIX: sebelumnya _buildReportIndex didefinisikan DUA KALI (versi kedua menimpa
@@ -54,6 +74,7 @@ function getData(key) {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     if (key === STORE.REPORTS) return parsed.map(_sanitizeReport);
+    if (key === STORE.SCHEDULES) return parsed.map(_sanitizeSchedule);
     return parsed;
   } catch { return []; }
 }

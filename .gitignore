@@ -8,3 +8,8 @@ backups/
 
 .vercel
 node_modules/
+
+# Foto yang diunggah ke server foto (hanya .htaccess yang di-commit)
+tools/foto-server/files/*
+!tools/foto-server/files/.htaccess
+tools/foto-server/config.php

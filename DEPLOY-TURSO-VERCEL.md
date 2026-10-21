@@ -172,3 +172,11 @@ Tidak ada langkah tambahan — cukup deploy. Setelah itu:
 
 Pemeriksaan cepat setelah deploy: buka `/manifest.webmanifest` dan `/sw.js` (keduanya harus tampil, bukan 404),
 lalu Chrome DevTools → Application → *Manifest* / *Service Workers* tanpa error.
+
+## 7. Rencana tanggal, nomor PM, dan foto
+
+- **Kolom baru** (`schedules.plan`, `reports.pmNo`, `reports.photos`) ditambahkan otomatis oleh `api/db.js` pada request pertama
+  setelah deploy (`ALTER TABLE ... ADD COLUMN`, aman diulang). Tidak perlu SQL manual.
+- **Foto**: nonaktif. Panduan lengkap di `tools/foto-server/README.md`. Opsional: Environment Variable `PHOTO_BASE_URL` di Vercel
+  agar database hanya menerima URL foto dari server foto Anda.
+- **Uji lokal tanpa database**: `http://localhost/PM/?demo=1` memuat data contoh ke browser (folder `dev/` tidak ikut ke Vercel).

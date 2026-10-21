@@ -165,7 +165,9 @@ function collectPMData() {
     ppe, aktivitas, spareParts,
     teknisi:  document.getElementById('pm-teknisi').value.trim(),
     approval: document.getElementById('pm-approval').value.trim(),
-    notes:    document.getElementById('pm-notes').value.trim()
+    notes:    document.getElementById('pm-notes').value.trim(),
+    pmNo:     parseInt(document.getElementById('pm-pmno')?.value) || null,
+    photos:   typeof photoCollect === 'function' ? photoCollect() : []
   };
 }
 
@@ -183,23 +185,27 @@ async function submitPM() {
   const rcaKurang = data.aktivitas.filter(a => a.no_checked && !(a.rca && a.rca.temuan && a.rca.penyebab && a.rca.tindakan));
   if (rcaKurang.length && !confirm(`⚠ ${rcaKurang.length} item anomali belum punya RCA lengkap (temuan, akar penyebab, tindakan perbaikan).\n\nTetap submit tanpa RCA lengkap?`)) return;
 
+  // Foto: tunggu unggahan selesai; foto yang gagal tidak ikut disimpan (konfirmasi dulu)
+  if (typeof photoPending === 'function') {
+    if (photoPending() > 0) { toast('Foto masih diunggah — tunggu sebentar', 'warning'); return; }
+    const failed = photoFailed();
+    if (failed > 0 && !confirm(`${failed} foto gagal diunggah dan TIDAK akan ikut tersimpan.\n\nLanjut simpan laporan?`)) return;
+  }
+
   const editId = document.getElementById('pm-edit-id')?.value || '';
   const isEdit = !!editId;
 
+  // Nomor PM melanjutkan nomor yang sudah ada pada tahun yang sama (lihat 25-pmno.js)
+  if (!isEdit) data.pmNo = nextPMNo(data, data.date);
+  else if (!data.pmNo) delete data.pmNo;
+
   if (!isEdit) {
     const existing = getData(STORE.REPORTS);
-    const d = new Date(data.date);
-    const duplikat = existing.find(r => {
-      if (!r.date) return false;
-      const rd = new Date(r.date);
-      const sameMonth = rd.getFullYear() === d.getFullYear() && rd.getMonth() === d.getMonth();
-      const sameEq = (r.tagNo && data.tagNo && r.tagNo.trim().toLowerCase() === data.tagNo.trim().toLowerCase())
-        || (r.equipmentName||'').trim().toLowerCase() === (data.equipmentName||'').trim().toLowerCase();
-      return sameMonth && sameEq;
-    });
+    // PM ulang pada hari yang berbeda sekarang WAJAR (diberi nomor PM ke-N). Konfirmasi hanya bila tanggalnya SAMA persis.
+    const duplikat = existing.find(r => r.date === data.date && pmSameEquipment(r, data));
     if (duplikat) {
       const tgl = new Date(duplikat.date).toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'});
-      const konfirmasi = confirm(`⚠ Laporan untuk "${data.equipmentName}" di bulan ini sudah ada (${tgl}).\n\nTetap submit laporan baru?`);
+      const konfirmasi = confirm(`⚠ Laporan untuk "${data.equipmentName}" pada ${tgl} sudah ada (PM ke-${pmNoOf(duplikat)}).\n\nTetap submit sebagai PM ke-${data.pmNo}?`);
       if (!konfirmasi) return;
     }
   }
@@ -274,7 +280,8 @@ function serializeReport(r) {
     equipmentName: r.equipmentName||'', unit: r.unit||'', area: r.area||'', periode: r.periode||'',
     week: r.week||'', month: r.month||'', teknisi: r.teknisi||'', approval: r.approval||'',
     notes: r.notes||'', submittedAt: r.submittedAt||'', updatedAt: r.updatedAt||'',
-    ppe: JSON.stringify(r.ppe||{}), aktivitas: JSON.stringify(r.aktivitas||[]), spareParts: JSON.stringify(r.spareParts||[])
+    ppe: JSON.stringify(r.ppe||{}), aktivitas: JSON.stringify(r.aktivitas||[]), spareParts: JSON.stringify(r.spareParts||[]),
+    pmNo: r.pmNo||'', photos: JSON.stringify(r.photos||[])
   };
 }
 
@@ -366,6 +373,8 @@ function editReport(id) {
   }
 
   document.getElementById('pm-edit-id').value = id;
+  if (typeof photoLoad === 'function') photoLoad(r.photos || []);
+  document.getElementById('pm-pmno').value = String(pmNoOf(r));
   const banner = document.getElementById('pm-edit-banner');
   banner.style.display = 'flex';
   document.getElementById('pm-edit-id-label').textContent = `ID: ${id}`;
@@ -375,6 +384,7 @@ function editReport(id) {
   // checkbox — padahal datanya sudah ter-render dalam keadaan tercentang.
   _updateChecklistProgress();
   _updateWOBar();
+  updatePMNoBanner();
 
   document.getElementById('page-reports').scrollIntoView({behavior:'smooth'});
   toast('📝 Mode edit — perbarui checklist lalu klik SUBMIT', 'info');
@@ -442,7 +452,9 @@ async function eksekusiPM(scheduleId) {
   resetWOFormSession();   // sesi baru → WO dari pengisian sebelumnya tidak terbawa
 
   showPage('reports');
-  toast(`▶ Eksekusi PM: ${s.equipment} — form sudah diisi otomatis`, 'success');
+  updatePMNoBanner();
+  const _no = parseInt(document.getElementById('pm-pmno')?.value) || 1;
+  toast(`▶ Eksekusi PM ke-${_no}: ${s.equipment} — form sudah diisi otomatis`, 'success');
   setTimeout(() => el('page-reports')?.scrollIntoView({ behavior: 'smooth' }), 150);
 
   // refresh badge di halaman lain supaya user lain langsung lihat status terkunci
@@ -478,6 +490,9 @@ function clearPMForm(silent = false) {
     </div>`;
   document.getElementById('pm-edit-id').value = '';
   document.getElementById('pm-edit-banner').style.display = 'none';
+  const _pmn = document.getElementById('pm-pmno'); if (_pmn) _pmn.value = '';
+  const _pmb = document.getElementById('pm-pmno-banner'); if (_pmb) _pmb.style.display = 'none';
+  if (typeof photoReset === 'function') photoReset();
 
   // Bersihkan jejak WO dari pengisian sebelumnya: sembunyikan bar anomali dan
   // mulai sesi form baru supaya tombol "Buat WO" kembali aktif untuk PM berikutnya.

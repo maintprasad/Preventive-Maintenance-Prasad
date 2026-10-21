@@ -3,6 +3,9 @@
 --
 -- TIDAK WAJIB dijalankan manual: api/db.js membuat tabel ini otomatis
 -- (CREATE TABLE IF NOT EXISTS) saat pertama kali dipanggil.
+-- Kolom plan / pmNo / photos ditambahkan belakangan: pada DB yang sudah ada, api/db.js menambahkannya otomatis
+-- lewat ALTER TABLE (lihat MIGRATIONS). Manual: ALTER TABLE schedules ADD COLUMN plan TEXT;
+--   ALTER TABLE reports ADD COLUMN pmNo INTEGER;  ALTER TABLE reports ADD COLUMN photos TEXT;
 -- File ini dihasilkan dari konstanta SCHEMA di api/db.js — kalau skema
 -- diubah, ubah di sana.
 --
@@ -24,6 +27,7 @@ CREATE TABLE IF NOT EXISTS schedules (
   mp             INTEGER,
   hari           INTEGER,
   notes          TEXT NOT NULL DEFAULT '',
+  plan           TEXT,
   startDate      TEXT NOT NULL DEFAULT '',
   takeoverAt     TEXT,
   takeoverFrom   TEXT,
@@ -52,6 +56,8 @@ CREATE TABLE IF NOT EXISTS reports (
   ppe            TEXT NOT NULL DEFAULT '{}',
   aktivitas      TEXT NOT NULL DEFAULT '[]',
   spareParts     TEXT NOT NULL DEFAULT '[]',
+  pmNo           INTEGER,
+  photos         TEXT,
   submittedAt    TEXT,
   updatedAt      TEXT NOT NULL,
   deletedAt      TEXT,
@@ -70,6 +76,7 @@ CREATE TABLE IF NOT EXISTS signatures (
   leaderName      TEXT NOT NULL DEFAULT '',
   leaderSignature TEXT NOT NULL DEFAULT '',
   leaderSignedAt  TEXT NOT NULL DEFAULT '',
+  signers         TEXT,
   updatedAt       TEXT NOT NULL,
   updatedBy       TEXT,
   serverAt        TEXT NOT NULL

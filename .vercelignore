@@ -2,6 +2,7 @@
 tools/
 backups/
 gas/
+dev/
 sql/
 test-wo.js
 *.md

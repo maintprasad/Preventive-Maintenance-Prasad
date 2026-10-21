@@ -304,3 +304,53 @@ membaca kode.
 - `tools/seed-coldstorage.js --send` sekarang **menolak berjalan** bila laporan seed (`PM-CS-*`) sudah ada di database
   (mencegah laporan ganda dan data yang sudah diedit/ditandatangani tertimpa). Gunakan `--force` hanya bila memang ingin menimpa.
   Dicakup oleh `tools/test-api.js`.
+
+---
+
+# Rencana PM per tanggal, Akhiri Tahun, nomor PM, dan foto (BELUM di-push — diuji di localhost)
+
+## 15. Perubahan
+
+| # | Perubahan | Berkas |
+|---|---|---|
+| 1 | **Modal Schedule PM berformat kalender bulanan**: tiap bulan tampil sebagai kalender (judul "Juni 2026 = 30 hari"), klik tanggal untuk memilih hari PM, penghitung hari terpilih, angka kecil = jumlah equipment LAIN yang sudah dijadwalkan di tanggal itu, tanda ✓ = tanggal yang sudah ada laporan PM. Tombol "Isi sesuai periode" dan "Muat dari jadwal lama". Bulan/minggu/hari kerja diturunkan otomatis dari tanggal pertama | `js/23-plan.js`, `js/09-schedule.js`, `index.html`, `css/style.css` |
+| 2 | **Modal Akhiri Tahun / Planning** (tombol di halaman Schedule): pilih tahun planning, ringkasan tahun berjalan & kesiapan planning, daftar equipment dengan status, "Atur" per equipment (membuka modal Schedule berkalender), **Buat otomatis dari pola** (salin pola tahun lalu / pola lama), **Atur tanggal bersama** (satu kalender → banyak equipment), Kosongkan planning. Rencana disimpan per tahun sehingga tahun lalu tidak terhapus | `js/24-yearend.js`, `index.html` |
+| 3 | Kalender Gantt, PDF Plan vs Actual (kini bisa memilih **tahun**), dan Takeover membaca rencana tanggal | `js/10-calendar.js`, `js/17-pdf-schedule.js`, `js/13-outstanding-takeover.js` |
+| 4 | **Nomor PM (PM ke-N)**: PM ulang pada equipment yang sama di tahun yang sama otomatis bernomor lanjutan (ke-1, ke-2, ke-3…). Banner di form, tombol **↻ PM Lagi** (Schedule, Daftar Laporan, popup Gantt), badge di Daftar Laporan, kolom di CSV, tampil di PDF. Konfirmasi duplikat kini hanya bila tanggal SAMA persis | `js/25-pmno.js`, `js/11-form-pm.js`, `js/12-reports.js`, `js/16-pdf-report.js` |
+| 5 | **Foto equipment** (upload ke server sendiri) — kode lengkap, **NONAKTIF** (`PHOTO_CONFIG.enabled=false`): ambil/pilih foto, diperkecil di HP, unggah dengan token, status/ulang, keterangan, tampil di PDF & daftar laporan. Penerima PHP + panduan di `tools/foto-server/` | `js/26-photos.js`, `js/00-config.js`, `tools/foto-server/` |
+| 6 | Backend: kolom `schedules.plan`, `reports.pmNo`, `reports.photos` + **migrasi otomatis** untuk DB yang sudah ada (ALTER TABLE saat request pertama), validasi tanggal/URL foto, klien lama tidak menghapus kolom baru (COALESCE) | `api/db.js`, `sql/schema.sql` |
+| 7 | Sync: rencana dari server (string JSON) disanitasi sebelum digabung | `js/04-sync.js`, `js/02-store.js` |
+| 8 | Data contoh khusus localhost: `http://localhost/PM/?demo=1` (atau `?demo=reset`) — tidak menyentuh database; folder `dev/` tidak ikut ke Vercel | `dev/demo-data.js`, `js/20-main.js`, `.vercelignore` |
+| 9 | Service worker `pm-3.2.0` (file baru masuk daftar cache) | `sw.js` |
+
+## 16. Catatan rilis
+
+- **Migrasi database** berjalan otomatis di request API pertama setelah deploy; tidak ada langkah manual. Kolom baru berisi NULL untuk data lama:
+  jadwal lama tetap memakai pola bulan + minggu + periode sampai rencana tanggalnya diisi.
+- **Foto** tetap mati sampai server foto siap — ikuti `tools/foto-server/README.md` (CSP `img-src`/`connect-src` perlu domain server foto).
+- Uji: `node tools/test-api.js` (17 tes), `node tools/check-css.js`.
+
+---
+
+# Unit resmi: Unit 1, Unit 2, Unit Malang
+
+- `PM_UNITS` (`js/00-config.js`) = daftar unit resmi dan urutannya. `getAllUnits()` selalu memuatnya (juga bila belum ada schedule),
+  sehingga **Unit Malang** langsung tersedia di Pengaturan, form Schedule, form laporan, modal PDF, dan modal Akhiri Tahun.
+- Dashboard: dua grafik yang di-hardcode (Unit 1 & Unit 2) diganti kartu grafik **per unit secara dinamis** (Unit 1, Unit 2, Unit Malang + unit lain yang punya schedule).
+- PDF Schedule: halaman pengesahan Unit Malang memakai label "Unit Malang" dengan penyetuju **Marrio Dwi Oktavianto**
+  (`_getApprovalNames()` di `js/17-pdf-schedule.js`).
+- Database/Turso **tidak diubah**: Unit Malang akan tercatat di master saat pertama dipakai (schedule dibuat / area ditambah).
+
+---
+
+# Unit Malang: format pengesahan 4 penanda tangan
+
+- Unit Malang memakai **4 penanda tangan**: **Teknisi PM (Execute by)**, **Supervisor MTC (Checked by)**, **Manager MTC (Review by)**,
+  **Plan Manager (Approved by)**. Definisi di `PM_UNIT_FORMATS` (`js/00-config.js`); unit tanpa entri memakai format standar (3 kolom) seperti sebelumnya.
+- **PDF laporan PM**: pengesahan 4 kolom (label dua bahasa, TTD, nama, tanggal). Kolom Execute terisi teknisi laporan; Plan Manager terisi bawaan
+  Marrio Dwi Oktavianto bila belum ditandatangani.
+- **Modal tanda tangan**: otomatis menampilkan 4 blok (satu per peran) untuk laporan Unit Malang; unit lain tetap 2 blok (Leader, Owner Area).
+- **PDF Schedule**: halaman pengesahan Unit Malang berisi 4 kotak yang sama (Plan Manager: Marrio Dwi Oktavianto); bilah tombol "PRINT / SAVE AS PDF"
+  kini benar-benar tersembunyi saat dicetak (sebelumnya `display:flex` inline mengalahkan `.no-print`).
+- **Database**: kolom `signatures.signers` (JSON; peran execute/checked/review/approved dengan nama, TTD PNG, waktu) + migrasi otomatis; klien lama tidak menghapusnya (COALESCE).
+- Uji: `node tools/test-api.js` (20 tes).

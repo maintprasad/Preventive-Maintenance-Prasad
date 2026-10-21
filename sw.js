@@ -17,7 +17,7 @@
    NAIKKAN VERSION setiap rilis yang mengubah daftar berkas di SHELL_FILES.
    ════════════════════════════════════════════════════════ */
 'use strict';
-const VERSION = 'pm-3.1.1';
+const VERSION = 'pm-3.2.0';
 const SHELL_CACHE = VERSION + '-shell';
 const CDN_CACHE = 'pm-cdn-v1';              // CDN versinya sudah dikunci di URL → tidak ikut VERSION
 const NETWORK_TIMEOUT_MS = 5000;
@@ -29,7 +29,7 @@ const SHELL_FILES = [
   'js/06-nav.js', 'js/07-dashboard.js', 'js/08-inputpm.js', 'js/09-schedule.js', 'js/10-calendar.js',
   'js/11-form-pm.js', 'js/12-reports.js', 'js/13-outstanding-takeover.js', 'js/14-templates.js',
   'js/15-signature.js', 'js/16-pdf-report.js', 'js/17-pdf-schedule.js', 'js/18-excel.js', 'js/19-wo.js',
-  'js/21-master.js', 'js/22-pwa.js', 'js/20-main.js',
+  'js/21-master.js', 'js/22-pwa.js', 'js/23-plan.js', 'js/24-yearend.js', 'js/25-pmno.js', 'js/26-photos.js', 'js/20-main.js',
 ];
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 

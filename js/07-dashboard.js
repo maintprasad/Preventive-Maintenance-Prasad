@@ -144,9 +144,18 @@ function renderDashboard() {
       <div class="stat-sub">${totalActual}/${totalPlan} equipment</div>
     </div>`;
 
-  ['Unit 1','Unit 2'].forEach((unitName, ui) => {
-    const canvasId = `chart-u${ui+1}`;
-    destroyChart(canvasId);
+  // Satu kartu grafik per unit: unit resmi (PM_UNITS: Unit 1, Unit 2, Unit Malang) + unit lain yang punya schedule
+  (window._dashChartIds || []).forEach(destroyChart);
+  const chartUnits = [...new Set([...PM_UNITS, ...units])];
+  window._dashChartIds = chartUnits.map((_, i) => `chart-unit-${i}`);
+  const chartHost = document.getElementById('dash-unit-charts');
+  if (chartHost) chartHost.innerHTML = chartUnits.map((u, i) => `<div class="section-card" style="margin-bottom:16px"><div class="section-card-title">🏭 ${escapeHtml(u)} — Plan vs Actual per Area</div>${
+    scheduleInPeriod.some(s => s.unit === u)
+      ? `<div style="position:relative;height:300px"><canvas id="chart-unit-${i}"></canvas></div>`
+      : '<div class="empty" style="padding:26px 20px"><div class="empty-msg">Belum ada schedule PM untuk unit ini.</div></div>'}</div>`).join('');
+
+  chartUnits.forEach((unitName, ui) => {
+    const canvasId = `chart-unit-${ui}`;
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
 

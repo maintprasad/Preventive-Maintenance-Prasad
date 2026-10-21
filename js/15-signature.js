@@ -2,6 +2,35 @@
 //  SIGNATURE SYSTEM
 // ════════════════════════════════════════════════════════
 let _sigPmId = null;
+let _sigRolesCur = [];   // peran yang sedang tampil di modal (format standar atau format unit, mis. Malang)
+
+// Peran penanda tangan menurut unit laporan. Standar: Leader (spv) + Owner Area (leader).
+// Unit dengan format khusus (PM_UNIT_FORMATS di 00-config.js, mis. Unit Malang): 4 peran tersimpan di signatures.signers.
+function sigRolesFor(unit) {
+  const f = pmUnitFormat(unit);
+  if (f) return f.roles.map(r => ({ key: r.key, title: r.title + ' (' + r.sub + ')', label: 'Nama ' + r.title, defaultName: r.defaultName || '', multi: true }));
+  return [{ key: 'spv', title: 'Leader Maintenance', label: 'Nama Leader', multi: false }, { key: 'leader', title: 'Owner Area', label: 'Nama Owner', multi: false }];
+}
+// Ada TTD sama sekali (standar atau multi)?
+const sigHasAny = sig => !!(sig && (sig.spvSig || sig.leaderSig || Object.values(sig.signers || {}).some(x => x && x.sig)));
+function _sigBlockHTML(r) {
+  const k = r.key;
+  return `<div class="section-card" style="margin-bottom:12px">
+      <div class="section-card-title">${escapeHtml(r.title)}</div>
+      <div class="form-grid" style="margin-bottom:10px">
+        <div class="fg"><span class="flabel">${escapeHtml(r.label)}</span><input class="finput" type="text" id="sig-${k}-name" placeholder="Nama lengkap"></div>
+        <div class="fg" style="justify-content:flex-end;padding-top:18px;flex-direction:row;gap:6px">
+          <button class="btn-primary" style="font-size:10px;flex:1" onclick="generateArtisticSignature('${k}')">✒️ Generate Otomatis</button>
+          <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('${k}')">🗑 Hapus TTD</button>
+        </div>
+      </div>
+      <div style="border:2px dashed var(--border);border-radius:8px;overflow:hidden;background:#fff;position:relative">
+        <canvas id="sig-canvas-${k}" width="720" height="140" style="width:100%;height:140px;display:block;cursor:crosshair;touch-action:none"></canvas>
+        <div id="sig-${k}-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:12px;color:var(--border);font-family:'IBM Plex Mono',monospace">Tanda tangan di sini</div>
+      </div>
+      <div id="sig-${k}-saved" style="display:none;margin-top:6px;font-size:11px;color:var(--green2);font-family:'IBM Plex Mono',monospace">✓ Tanda tangan sudah tersimpan</div>
+    </div>`;
+}
 
 function getLocalSigs() {
   try { const raw = _useLS ? localStorage.getItem(STORE_SIGS) : (_mem[STORE_SIGS]||null); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
@@ -14,6 +43,19 @@ function saveLocalSig(pmId, data) {
 
 // Gabungkan TTD dari server (hasil getSignatures saat sync) ke penyimpanan lokal.
 // Yang lebih baru (updatedAt) menang; TTD yang masih di antrian upload tidak ditimpa.
+// signers dari server datang sebagai string JSON → object { peran: {name, sig, at} } dengan gambar & nama yang sudah divalidasi
+function _parseSigners(v, isImg) {
+  let o = v;
+  if (typeof v === 'string') { try { o = JSON.parse(v); } catch { o = {}; } }
+  const out = {};
+  if (o && typeof o === 'object' && !Array.isArray(o)) {
+    ['execute', 'checked', 'review', 'approved'].forEach(k => {
+      const x = o[k]; if (!x || typeof x !== 'object') return;
+      out[k] = { name: neutralizeText(String(x.name || '')), sig: isImg(x.sig) ? x.sig : '', at: x.at || '' };
+    });
+  }
+  return out;
+}
 function mergeRemoteSignatures(list) {
   const sigs = getLocalSigs();
   const pending = getPendingRecordIds();
@@ -26,6 +68,7 @@ function mergeRemoteSignatures(list) {
     sigs[s.pmId] = {
       spvName: neutralizeText(s.spvName || ''),       spvSig: isImg(s.spvSignature) ? s.spvSignature : '',       spvAt: s.spvSignedAt || '',
       leaderName: neutralizeText(s.leaderName || ''), leaderSig: isImg(s.leaderSignature) ? s.leaderSignature : '', leaderAt: s.leaderSignedAt || '',
+      signers: _parseSigners(s.signers, isImg),
       updatedAt: s.updatedAt || new Date().toISOString()
     };
     changed = true;
@@ -45,16 +88,18 @@ function openSignatureModal(pmId) {
     `<div style="color:var(--text3);font-size:11px">📅 ${dateFmt} &nbsp;·&nbsp; 👤 Teknisi: <strong>${r.teknisi||'—'}</strong> &nbsp;·&nbsp; 🏭 ${r.unit||'—'}</div>`;
 
   const existing = getLocalSigs()[pmId] || {};
-  document.getElementById('sig-spv-name').value = existing.spvName || '';
-  document.getElementById('sig-leader-name').value = existing.leaderName || '';
-
-  setupSigCanvas('spv');
-  setupSigCanvas('leader');
-
-  if (existing.spvSig) { loadImgToCanvas('sig-canvas-spv', existing.spvSig); document.getElementById('sig-spv-saved').style.display = 'block'; document.getElementById('sig-spv-hint').style.display = 'none'; }
-  else { document.getElementById('sig-spv-saved').style.display = 'none'; document.getElementById('sig-spv-hint').style.display = 'flex'; }
-  if (existing.leaderSig) { loadImgToCanvas('sig-canvas-leader', existing.leaderSig); document.getElementById('sig-leader-saved').style.display = 'block'; document.getElementById('sig-leader-hint').style.display = 'none'; }
-  else { document.getElementById('sig-leader-saved').style.display = 'none'; document.getElementById('sig-leader-hint').style.display = 'flex'; }
+  const roles = sigRolesFor(r.unit);
+  _sigRolesCur = roles;
+  document.getElementById('sig-blocks').innerHTML = roles.map(_sigBlockHTML).join('');
+  roles.forEach(ro => {
+    const cur = ro.multi ? ((existing.signers || {})[ro.key] || {})
+      : (ro.key === 'spv' ? { name: existing.spvName, sig: existing.spvSig } : { name: existing.leaderName, sig: existing.leaderSig });
+    // nama awal: yang tersimpan → nama bawaan peran (mis. Plan Manager Malang) → teknisi untuk peran "execute"
+    document.getElementById('sig-' + ro.key + '-name').value = cur.name || ro.defaultName || (ro.key === 'execute' ? (r.teknisi || '') : '');
+    setupSigCanvas(ro.key);
+    if (cur.sig) { loadImgToCanvas('sig-canvas-' + ro.key, cur.sig); document.getElementById('sig-' + ro.key + '-saved').style.display = 'block'; document.getElementById('sig-' + ro.key + '-hint').style.display = 'none'; }
+    else { document.getElementById('sig-' + ro.key + '-saved').style.display = 'none'; document.getElementById('sig-' + ro.key + '-hint').style.display = 'flex'; }
+  });
 
   openOverlay('signatureOverlay');
 }
@@ -146,7 +191,7 @@ async function drawArtisticSignatureToCanvas(canvas, name) {
 }
 
 async function generateArtisticSignature(role) {
-  const nameInput = document.getElementById(role === 'spv' ? 'sig-spv-name' : 'sig-leader-name');
+  const nameInput = document.getElementById('sig-' + role + '-name');
   const name = (nameInput?.value || '').trim();
   if (!name) { toast('Isi nama terlebih dahulu sebelum generate tanda tangan', 'error'); return; }
   const canvas = document.getElementById('sig-canvas-' + role);
@@ -167,20 +212,28 @@ function isCanvasBlank(canvasId) {
 
 async function saveSignaturesAndPDF() {
   if (!_sigPmId) return;
-  const spvName = document.getElementById('sig-spv-name').value.trim();
-  const leaderName = document.getElementById('sig-leader-name').value.trim();
-  const spvEmpty = isCanvasBlank('sig-canvas-spv');
-  const leaderEmpty = isCanvasBlank('sig-canvas-leader');
-  if (!spvEmpty && !spvName) { toast('Isi nama Supervisor','error'); return; }
-  if (!leaderEmpty && !leaderName) { toast('Isi nama Leader','error'); return; }
-
+  const roles = _sigRolesCur.length ? _sigRolesCur : sigRolesFor('');
   const now = new Date().toISOString();
-  const spvC = document.getElementById('sig-canvas-spv');
-  const ldC = document.getElementById('sig-canvas-leader');
-  const sigData = {
-    spvName, spvSig: spvEmpty ? '' : spvC.toDataURL('image/png'), spvAt: spvEmpty ? '' : now,
-    leaderName, leaderSig: leaderEmpty ? '' : ldC.toDataURL('image/png'), leaderAt: leaderEmpty ? '' : now
+  const read = ro => {
+    const name = document.getElementById('sig-' + ro.key + '-name').value.trim();
+    const empty = isCanvasBlank('sig-canvas-' + ro.key);
+    return { ro, name, empty, data: empty ? '' : document.getElementById('sig-canvas-' + ro.key).toDataURL('image/png') };
   };
+  const vals = roles.map(read);
+  const bad = vals.find(v => !v.empty && !v.name);
+  if (bad) { toast('Isi nama ' + bad.ro.title, 'error'); return; }
+
+  let sigData, payload;
+  if (roles[0].multi) {
+    const signers = {};
+    vals.forEach(v => { if (v.name || v.data) signers[v.ro.key] = { name: v.name, sig: v.data, at: v.empty ? '' : now }; });
+    sigData = { signers };
+    payload = { signers };
+  } else {
+    const [spv, ld] = vals;
+    sigData = { spvName: spv.name, spvSig: spv.data, spvAt: spv.empty ? '' : now, leaderName: ld.name, leaderSig: ld.data, leaderAt: ld.empty ? '' : now };
+    payload = { spvName: sigData.spvName, spvSignature: sigData.spvSig, spvSignedAt: sigData.spvAt, leaderName: sigData.leaderName, leaderSignature: sigData.leaderSig, leaderSignedAt: sigData.leaderAt };
+  }
   saveLocalSig(_sigPmId, sigData);
   toast('Tanda tangan disimpan ✓','success');
 
@@ -190,9 +243,7 @@ async function saveSignaturesAndPDF() {
   if (backendEnabled()) {
     const r = getData(STORE.REPORTS).find(x=>x.id===_sigPmId)||{};
     apiOrQueue('saveSignature',{signature:{pmId:_sigPmId,tagNo:r.tagNo||'',equipmentName:r.equipmentName||'',tanggal:r.date||'',
-      spvName:sigData.spvName, spvSignature:sigData.spvSig, spvSignedAt:sigData.spvAt,
-      leaderName:sigData.leaderName, leaderSignature:sigData.leaderSig, leaderSignedAt:sigData.leaderAt,
-      updatedAt:now}}, 'SIG:' + _sigPmId);
+      ...payload, updatedAt:now}}, 'SIG:' + _sigPmId);
   }
   closeOverlay('signatureOverlay');
   downloadPMPDFById(_sigPmId);

@@ -83,8 +83,7 @@
     <button class="btn-ghost" onclick="clearDashFilters()">✕ Reset</button>
   </div>
   <div id="dash-kpi-bar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px"></div>
-  <div class="section-card" style="margin-bottom:16px"><div class="section-card-title">🏭 Unit 1 — Plan vs Actual per Area</div><div style="position:relative;height:300px"><canvas id="chart-u1"></canvas></div></div>
-  <div class="section-card" style="margin-bottom:16px"><div class="section-card-title">🏭 Unit 2 — Plan vs Actual per Area</div><div style="position:relative;height:300px"><canvas id="chart-u2"></canvas></div></div>
+  <div id="dash-unit-charts"></div>
   <div id="dash-table-wrap"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px" id="dash-top-grid">
     <div class="chart-card"><div class="chart-lbl">Status Schedule PM</div><div class="chart-wrap" style="height:200px"><canvas id="cStatus"></canvas></div></div>
@@ -125,6 +124,7 @@
       <button class="btn-blue" onclick="openDownloadPDFModal()">📥 Download PDF</button>
       <button class="btn-orange" onclick="openCompletionReportModal('pdf')">📊 Report Ketercapaian (PDF)</button>
       <button class="btn-ghost" style="border-color:rgba(74,158,63,.5);color:var(--green2)" onclick="openCompletionReportModal('excel')">📗 Report Ketercapaian (Excel)</button>
+      <button class="btn-ghost" style="border-color:rgba(43,108,184,.45);color:var(--blue)" onclick="openYearEndModal()" title="Susun rencana PM tahun berikutnya">🗓 Akhiri Tahun / Planning</button>
       <button class="btn-primary" onclick="openScheduleModal()">+ TAMBAH</button>
     </div>
   </div>
@@ -192,6 +192,8 @@
   </div>
   <input type="hidden" id="pm-edit-id" value="">
 
+  <div id="pm-pmno-banner" class="pmno-banner" style="display:none"></div>
+  <input type="hidden" id="pm-pmno" value="">
   <div class="lock-banner" id="pm-lock-info" style="display:none">🔒 Equipment ini sedang Anda kunci — laporan lain tidak bisa mengerjakan equipment yang sama sampai Anda submit atau batalkan.</div>
 
   <div class="section-card">
@@ -267,6 +269,17 @@
       <div class="sparepart-row"><div class="sp-num">1</div><input type="text" class="sp-input pm-sp-uraian" placeholder="Uraian"><input type="text" class="sp-input pm-sp-spec" placeholder="Spesifikasi"><input type="number" class="sp-input pm-sp-jumlah" placeholder="Qty"><button class="sp-del" onclick="removeSP(this)">✕</button></div>
     </div>
     <button class="btn-ghost" style="margin-top:10px;font-size:12px" onclick="addSP()">+ Tambah Baris</button>
+  </div>
+
+  <div class="section-card" id="pm-photo-card">
+    <div class="section-card-title">Foto Equipment <span id="pm-photo-state" class="badge b-yearly" style="margin-left:8px">belum diaktifkan</span></div>
+    <div id="pm-photo-off" class="settings-hint" style="margin-bottom:8px">📷 Fitur foto belum diaktifkan. Kodenya sudah siap — isi alamat server foto di <b>js/00-config.js</b> (PHOTO_CONFIG) lalu ubah <b>enabled</b> menjadi <b>true</b>.</div>
+    <div class="photo-actions">
+      <label class="btn-primary photo-btn" id="pm-photo-cam">📷 Ambil Foto<input type="file" accept="image/*" capture="environment" hidden onchange="photoPick(this.files);this.value=''"></label>
+      <label class="btn-ghost photo-btn" id="pm-photo-gal">🖼 Pilih dari Galeri<input type="file" accept="image/*" multiple hidden onchange="photoPick(this.files);this.value=''"></label>
+      <span id="pm-photo-count" class="settings-hint">0 foto</span>
+    </div>
+    <div id="pm-photo-grid" class="photo-grid"></div>
   </div>
 
   <div class="section-card">
@@ -491,6 +504,46 @@
 
 <div id="toast-container"></div>
 
+<!-- MODAL: AKHIRI TAHUN — PLANNING TAHUN BARU (daftar equipment; tiap equipment diatur lewat modal Schedule berformat kalender) -->
+<div class="overlay" id="yearEndOverlay"><div class="modal modal-xl" style="display:flex;flex-direction:column;max-height:94vh">
+  <div class="modal-hdr" style="flex-shrink:0">
+    <div><span class="modal-title">🗓 Akhiri Tahun — Planning Tahun Baru</span><div class="sec-sub">Susun jadwal PM tahun berikutnya. Tiap equipment diatur di kalender; rencana tahun-tahun sebelumnya tidak dihapus.</div></div>
+    <button class="modal-close" onclick="closeOverlay('yearEndOverlay')">×</button>
+  </div>
+  <div class="modal-body" style="flex:1;overflow-y:auto">
+    <div class="ye-top">
+      <div class="fg" style="min-width:150px"><span class="flabel">Tahun planning</span><select class="fsel2" id="ye-year" onchange="yeRender(true)"></select></div>
+      <div id="ye-summary" class="ye-summary"></div>
+    </div>
+    <div class="toolbar" style="margin-top:12px">
+      <div class="search-wrap"><span style="color:var(--text3)">🔍</span><input type="text" id="ye-search" placeholder="Cari equipment, area, tag..." oninput="yeRender(true)"/></div>
+      <select class="fsel" id="ye-unit" onchange="onUnitAreaPairChange('ye-unit','ye-area');yeRender(true)"></select>
+      <select class="fsel" id="ye-area" onchange="yeRender(true)"></select>
+      <select class="fsel" id="ye-filter" onchange="yeRender(true)"><option value="">Semua</option><option value="belum">⚠ Belum direncanakan</option><option value="sudah">✓ Sudah direncanakan</option></select>
+    </div>
+    <div class="ye-bulk">
+      <label class="ye-all"><input type="checkbox" id="ye-checkall" onchange="yeToggleAll(this.checked)"> Pilih semua yang tampil</label>
+      <button class="btn-ghost" onclick="yeAutoPlan()" title="Salin pola tahun lalu (atau pola jadwal lama) ke tahun planning untuk equipment yang dipilih">⚡ Buat otomatis dari pola</button>
+      <button class="btn-primary" onclick="yeOpenBulk()" title="Pilih beberapa tanggal sekaligus lalu terapkan ke semua equipment yang dipilih">🗓 Atur tanggal bersama</button>
+      <button class="btn-red" onclick="yeClear()">🗑 Kosongkan planning</button>
+      <span id="ye-selcount" class="ye-selcount">0 dipilih</span>
+    </div>
+    <div id="ye-list"></div>
+    <div class="pagination" id="ye-pag" style="display:none"><span class="page-info" id="ye-pageinfo"></span><div style="display:flex;gap:6px"><button class="pnav" id="ye-prev" onclick="yePage(-1)">← Prev</button><button class="pnav" id="ye-next" onclick="yePage(1)">Next →</button></div></div>
+  </div>
+</div></div>
+
+<!-- MODAL: ATUR TANGGAL BERSAMA (kalender untuk banyak equipment sekaligus) -->
+<div class="overlay" id="planOverlay"><div class="modal modal-lg" style="display:flex;flex-direction:column;max-height:94vh">
+  <div class="modal-hdr" style="flex-shrink:0"><div><span class="modal-title" id="plan-bulk-title">Atur Tanggal PM</span><div class="sec-sub" id="plan-bulk-sub"></div></div><button class="modal-close" onclick="closeOverlay('planOverlay')">×</button></div>
+  <div class="modal-body" style="flex:1;overflow-y:auto">
+    <div id="plan-bulk-cal"></div>
+    <div class="fg" style="margin-top:12px"><span class="flabel">Cara menerapkan</span>
+      <select class="fsel2" id="plan-bulk-mode"><option value="replace">Gantikan rencana tahun ini dengan tanggal di atas</option><option value="append">Tambahkan tanggal di atas ke rencana yang sudah ada</option></select></div>
+    <div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('planOverlay')">Batal</button><button class="btn-primary" onclick="yeApplyBulk()">💾 Terapkan ke <span id="plan-bulk-count">0</span> equipment</button></div>
+  </div>
+</div></div>
+
 <!-- MODAL: SCHEDULE -->
 <div class="overlay" id="scheduleOverlay"><div class="modal modal-lg">
   <div class="modal-hdr"><span class="modal-title" id="schModalTitle">Tambah Schedule PM</span><button class="modal-close" onclick="closeOverlay('scheduleOverlay')">×</button></div>
@@ -511,15 +564,14 @@
       <div class="fg"><span class="flabel">Periode *</span><select class="fsel2" id="sch-periode">
         <option value="Daily">Daily</option><option value="Weekly">Weekly</option><option value="Monthly" selected>Monthly</option><option value="Quarterly">Quarterly</option><option value="Semi-Annual">Semi-Annual</option><option value="Annual">Annual</option>
       </select></div>
-      <div class="fg"><span class="flabel">Bulan Pengerjaan *</span><select class="fsel2" id="sch-month">
-        <option value="1">Januari</option><option value="2">Februari</option><option value="3">Maret</option><option value="4">April</option><option value="5">Mei</option><option value="6">Juni</option>
-        <option value="7">Juli</option><option value="8">Agustus</option><option value="9">September</option><option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
-      </select></div>
-      <div class="fg"><span class="flabel">Minggu Ke *</span><select class="fsel2" id="sch-week"><option value="1">Minggu 1</option><option value="2">Minggu 2</option><option value="3">Minggu 3</option><option value="4">Minggu 4</option><option value="5">Minggu 5</option></select></div>
+      <input type="hidden" id="sch-month"><input type="hidden" id="sch-week"><input type="hidden" id="sch-hari">
+      <div class="fg full"><span class="flabel">Rencana PM — pilih tanggal di kalender *</span>
+        <div id="sch-plan-cal"></div>
+        <div class="settings-hint" style="margin-top:6px">Ringkasan: <b id="sch-plan-info">—</b>. Bulan, minggu, dan estimasi hari kerja diturunkan otomatis dari tanggal yang dipilih.</div>
+      </div>
       <div class="fg"><span class="flabel">PIC Utama</span><input class="finput" type="text" id="sch-pic" placeholder="Nama teknisi PIC"></div>
       <div class="fg"><span class="flabel">PM Terakhir Dilakukan</span><input class="finput" type="date" id="sch-last-done"></div>
       <div class="fg"><span class="flabel">Jumlah Man Power (MP)</span><input class="finput" type="number" id="sch-mp" placeholder="Jumlah orang" min="0"></div>
-      <div class="fg"><span class="flabel">Estimasi Hari Kerja</span><input class="finput" type="number" id="sch-hari" placeholder="Jumlah hari" min="0"></div>
       <div class="fg full"><span class="flabel">Catatan</span><textarea class="ftextarea" id="sch-notes" rows="2" placeholder="Catatan tambahan..."></textarea></div>
     </div>
     <div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('scheduleOverlay')">Batal</button><button class="btn-primary" onclick="saveSchedule()">💾 SIMPAN SCHEDULE</button></div>
@@ -573,36 +625,7 @@
   <div class="modal-hdr"><span class="modal-title">✍ Tanda Tangan Digital — Pengesahan Laporan PM</span><button class="modal-close" onclick="closeOverlay('signatureOverlay')">×</button></div>
   <div class="modal-body">
     <div id="sig-pm-info" style="margin-bottom:16px;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text2)"></div>
-    <div class="section-card" style="margin-bottom:12px">
-      <div class="section-card-title">Leader Maintenance</div>
-      <div class="form-grid" style="margin-bottom:10px">
-        <div class="fg"><span class="flabel">Nama Leader</span><input class="finput" type="text" id="sig-spv-name" placeholder="Nama lengkap Leader"></div>
-        <div class="fg" style="justify-content:flex-end;padding-top:18px;flex-direction:row;gap:6px">
-          <button class="btn-primary" style="font-size:10px;flex:1" onclick="generateArtisticSignature('spv')">✒️ Generate Otomatis</button>
-          <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('spv')">🗑 Hapus TTD</button>
-        </div>
-      </div>
-      <div style="border:2px dashed var(--border);border-radius:8px;overflow:hidden;background:#fff;position:relative">
-        <canvas id="sig-canvas-spv" width="720" height="140" style="width:100%;height:140px;display:block;cursor:crosshair;touch-action:none"></canvas>
-        <div id="sig-spv-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:12px;color:var(--border);font-family:'IBM Plex Mono',monospace">Tanda tangan di sini</div>
-      </div>
-      <div id="sig-spv-saved" style="display:none;margin-top:6px;font-size:11px;color:var(--green2);font-family:'IBM Plex Mono',monospace">✓ Tanda tangan sudah tersimpan</div>
-    </div>
-    <div class="section-card" style="margin-bottom:16px">
-      <div class="section-card-title">Owner Area</div>
-      <div class="form-grid" style="margin-bottom:10px">
-        <div class="fg"><span class="flabel">Nama Owner</span><input class="finput" type="text" id="sig-leader-name" placeholder="Nama lengkap Leader"></div>
-        <div class="fg" style="justify-content:flex-end;padding-top:18px;flex-direction:row;gap:6px">
-          <button class="btn-primary" style="font-size:10px;flex:1" onclick="generateArtisticSignature('leader')">✒️ Generate Otomatis</button>
-          <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('leader')">🗑 Hapus TTD</button>
-        </div>
-      </div>
-      <div style="border:2px dashed var(--border);border-radius:8px;overflow:hidden;background:#fff;position:relative">
-        <canvas id="sig-canvas-leader" width="720" height="140" style="width:100%;height:140px;display:block;cursor:crosshair;touch-action:none"></canvas>
-        <div id="sig-leader-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:12px;color:var(--border);font-family:'IBM Plex Mono',monospace">Tanda tangan di sini</div>
-      </div>
-      <div id="sig-leader-saved" style="display:none;margin-top:6px;font-size:11px;color:var(--green2);font-family:'IBM Plex Mono',monospace">✓ Tanda tangan sudah tersimpan</div>
-    </div>
+    <div id="sig-blocks"></div>
     <div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('signatureOverlay')">Batal</button><button class="btn-primary" onclick="saveSignaturesAndPDF()" style="min-width:220px;font-size:13px;padding:10px 20px">💾 SIMPAN & BUKA PDF</button></div>
   </div>
 </div></div>
@@ -665,6 +688,7 @@
     <div class="form-grid" style="margin-bottom:6px">
       <div class="fg"><span class="flabel">Unit</span><select class="fsel2" id="dlpdf-unit" onchange="onUnitAreaPairChange('dlpdf-unit','dlpdf-area')"></select></div>
       <div class="fg"><span class="flabel">Area</span><select class="fsel2" id="dlpdf-area" onchange="updateDownloadPDFCount()"></select></div>
+      <div class="fg"><span class="flabel">Tahun</span><select class="fsel2" id="dlpdf-year"></select></div>
     </div>
     <div id="dlpdf-count" style="font-size:11px;color:var(--text3);margin-bottom:14px"></div>
     <p style="color:var(--text2);font-size:13px;margin-bottom:10px">Pilih jenis laporan PDF yang ingin didownload:</p>
@@ -719,6 +743,10 @@
 <script src="js/18-excel.js"></script>
 <script src="js/19-wo.js"></script>
 <script src="js/21-master.js"></script>
+<script src="js/23-plan.js"></script>
+<script src="js/24-yearend.js"></script>
+<script src="js/25-pmno.js"></script>
+<script src="js/26-photos.js"></script>
 <script src="js/22-pwa.js"></script>
 <script src="js/20-main.js"></script>
 </body>

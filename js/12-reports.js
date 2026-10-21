@@ -50,9 +50,9 @@ async function deleteReport(id) {
 function exportReportsCSV() {
   const reports = getData(STORE.REPORTS);
   if (!reports.length) { toast('Tidak ada laporan','info'); return; }
-  const headers = ['ID','Tag No','Tanggal','Unit','Area','Equipment Type','Equipment Name','Periode','Minggu','Teknisi','Approval','Notes','Submitted At'];
+  const headers = ['ID','Tag No','Tanggal','Unit','Area','Equipment Type','Equipment Name','Periode','Minggu','PM Ke','Jumlah Foto','Teknisi','Approval','Notes','Submitted At'];
   const rows = reports.map(r => [
-    r.id,r.tagNo,r.date,r.unit||'',r.area||'',EQ_LABELS[r.equipmentType]||r.equipmentType||'',r.equipmentName,r.periode,r.week||'',r.teknisi,r.approval,r.notes,r.submittedAt
+    r.id,r.tagNo,r.date,r.unit||'',r.area||'',EQ_LABELS[r.equipmentType]||r.equipmentType||'',r.equipmentName,r.periode,r.week||'',pmNoOf(r),(r.photos||[]).length,r.teknisi,r.approval,r.notes,r.submittedAt
   ].map(v=>`"${(v||'').toString().replace(/"/g,'""')}"`).join(','));
   const csv = [headers.join(','),...rows].join('\n');
   const a = document.createElement('a');
@@ -109,7 +109,7 @@ function renderReportPage() {
     const spCount    = Array.isArray(r.spareParts) ? r.spareParts.filter(s=>s&&s.uraian).length : 0;
     const pct        = aktTotal ? Math.round(aktDone/aktTotal*100) : 0;
     const pctColor   = pct===100 ? 'var(--green)' : pct>=60 ? 'var(--orange)' : 'var(--red)';
-    const hasSig = sigs[r.id] && (sigs[r.id].spvSig || sigs[r.id].leaderSig);
+    const hasSig = sigHasAny(sigs[r.id]);
     const wo     = getWOForReport(r.id);           // WO terkait laporan ini (atau null)
     const woSt   = wo ? (WO_STATUS[wo.status] || WO_STATUS.open) : null;
 
@@ -156,6 +156,8 @@ function renderReportPage() {
         <span class="badge ${periodeBadgeClass}" style="margin-left:2px">${r.periode}</span>
         ${spCount > 0 ? `<span style="font-size:11px;color:var(--accent)">📦 ${spCount} spare part</span>` : ''}
         ${r.week ? `<span style="font-size:11px;color:var(--text3)">W${r.week}</span>` : ''}
+        <span class="badge b-weekly" style="font-size:9px" title="Nomor PM equipment ini pada tahun ${(r.date||'').slice(0,4)}">PM ke-${pmNoOf(r)}</span>
+        ${(r.photos||[]).length ? `<span style="font-size:11px;color:var(--accent)">📷 ${r.photos.length} foto</span>` : ''}
       </div>
       ${checklistBar}
       ${r.notes ? `<div style="margin-top:8px;font-size:11px;color:var(--text3);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.notes}">"${r.notes.substring(0,100)}${r.notes.length>100?'...':''}"</div>` : ''}
@@ -163,6 +165,7 @@ function renderReportPage() {
         <button class="tbl-btn pdf" onclick="downloadPMPDFById('${r.id}')">📄 PDF</button>
         <button class="tbl-btn" style="border-color:rgba(43,108,184,.35);color:var(--blue)" onclick="openSignatureModal('${r.id}')">✍ TTD</button>
         ${woBtn}
+        <button class="tbl-btn" style="border-color:rgba(74,158,63,.4);color:var(--green2)" onclick="pmAgainFromReport('${r.id}')" title="Lakukan PM lagi pada equipment ini (nomor PM akan melanjutkan)">↻ PM Lagi</button>
         <button class="tbl-btn" style="border-color:rgba(230,126,34,.35);color:var(--orange)" onclick="editReport('${r.id}')">✏ Edit</button>
         <button class="tbl-btn del" onclick="deleteReport('${r.id}')">🗑</button>
       </div>

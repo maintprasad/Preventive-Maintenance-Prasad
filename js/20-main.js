@@ -1,7 +1,21 @@
 // ════════════════════════════════════════════════════════
 //  BOOTSTRAP
 // ════════════════════════════════════════════════════════
-window.addEventListener('load', () => {
+// Data contoh untuk uji di komputer sendiri: http://localhost/PM/?demo=1 (atau ?demo=reset). Folder dev/ tidak ikut ke Vercel.
+function _loadDemoIfRequested(done) {
+  const local = ['localhost', '127.0.0.1'].includes(location.hostname);
+  const q = new URLSearchParams(location.search).get('demo');
+  if (!local || !q) { done(); return; }
+  const s = document.createElement('script');
+  s.src = 'dev/demo-data.js';
+  s.onload = () => { try { if (window.__PM_DEMO__(q === 'reset')) toast('Data contoh dimuat (hanya di browser ini)', 'success'); } catch (e) { console.warn('[demo]', e); } done(); };
+  s.onerror = () => done();
+  document.head.appendChild(s);
+}
+
+window.addEventListener('load', () => _loadDemoIfRequested(_bootstrapApp));
+
+function _bootstrapApp() {
   applyLocalTemplates();
   applyMasterToRuntime();   // tipe equipment tambahan (master data) → EQ_LABELS + semua dropdown
   // Data lama di localStorage (sebelum versi ini) belum dinetralkan — tulis
@@ -38,4 +52,4 @@ window.addEventListener('load', () => {
   renderInputPMPage();
   populateUnitFilters();
   updateSidebarBadges();
-});
+}

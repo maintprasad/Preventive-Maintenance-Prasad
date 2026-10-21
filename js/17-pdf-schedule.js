@@ -33,6 +33,8 @@ function updateDownloadPDFCount() {
 function openDownloadPDFModal() {
   const schedules = getData(STORE.SCHEDULES);
   if (!schedules.length) { toast('Belum ada schedule PM', 'warning'); return; }
+  const yNow = new Date().getFullYear(), ySel = document.getElementById('dlpdf-year');
+  if (ySel) { const keep = ySel.value; ySel.innerHTML = [yNow - 1, yNow, yNow + 1, yNow + 2].map(y => `<option value="${y}">${y}${y === yNow ? ' (tahun berjalan)' : ''}</option>`).join(''); ySel.value = keep || String(yNow); }
   // Default mengikuti filter di halaman Schedule, tapi bisa diubah per unit / per area di modal
   fillUnitAreaPair('dlpdf-unit', 'dlpdf-area',
     document.getElementById('sch-filter-unit')?.value || '',
@@ -43,14 +45,17 @@ function openDownloadPDFModal() {
 
 function _getApprovalNames(unitName) {
   const u = (unitName || '').toLowerCase();
+  const disusun = 'Iwan Prasetyo', diperiksa = 'Irawan Krisna Hadi';
+  // Unit Malang: 4 penanda tangan (lihat PM_UNIT_FORMATS) — nama bawaan hanya untuk peran yang punya defaultName
+  if (u.includes('malang')) return { unitLabel: 'Unit Malang', boxes: pmUnitFormat('Unit Malang').roles.map(r => ({ title: r.title, sub: r.sub, name: r.defaultName || '' })) };
   const isUnit2 = u.includes('2');
-  return { unitLabel: isUnit2 ? 'Unit - 2' : 'Unit - 1', disusun: 'Iwan Prasetyo', diperiksa: 'Irawan Krisna Hadi', disetujui: isUnit2 ? 'Wida Laksono' : 'Willy Triyono' };
+  return { unitLabel: isUnit2 ? 'Unit - 2' : 'Unit - 1', boxes: [{ title: 'Disusun Oleh', name: disusun }, { title: 'Diperiksa Oleh', name: diperiksa }, { title: 'Disetujui Oleh', name: isUnit2 ? 'Wida Laksono' : 'Willy Triyono' }] };
 }
 
-function _buildApprovalPageHTML(unitName, isPlanningOnly) {
+function _buildApprovalPageHTML(unitName, isPlanningOnly, year) {
   const info = _getApprovalNames(unitName);
   const modeLabel = isPlanningOnly ? 'Planning Schedule' : 'Plan vs Actual';
-  const curYear = new Date().getFullYear();
+  const curYear = year || new Date().getFullYear();
   return `<div style="page-break-after:always;display:flex;flex-direction:column;justify-content:center;align-items:center;min-height:600px;padding:30px 40px">
     <div style="text-align:center;margin-bottom:50px">
       <div style="font-size:11pt;font-weight:700;color:#1a3a6b;letter-spacing:.06em">PT PRASAD SEEDS INDONESIA</div>
@@ -59,11 +64,7 @@ function _buildApprovalPageHTML(unitName, isPlanningOnly) {
       <div style="display:inline-block;margin-top:10px;padding:5px 18px;background:#c0392b;color:#fff;font-size:12pt;font-weight:800;letter-spacing:.1em;border-radius:3px">FOR APPROVAL</div>
       <div style="font-size:9pt;color:#888;margin-top:10px">${modeLabel} — Tahun ${curYear}</div>
     </div>
-    <table style="width:100%;max-width:640px;border-collapse:collapse"><tr>
-      <td style="width:33.34%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top"><div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:64px">Disusun Oleh</div><div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700">${info.disusun}</div></td>
-      <td style="width:33.33%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top"><div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:64px">Diperiksa Oleh</div><div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700">${info.diperiksa}</div></td>
-      <td style="width:33.33%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top"><div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:64px">Disetujui Oleh</div><div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700">${info.disetujui}</div></td>
-    </tr></table>
+    <table style="width:100%;max-width:${info.boxes.length > 3 ? 780 : 640}px;border-collapse:collapse"><tr>${info.boxes.map(bx => `<td style="width:${(100 / info.boxes.length).toFixed(2)}%;text-align:center;border:1px solid #1a3a6b;padding:16px 10px 12px;vertical-align:top"><div style="font-size:9pt;font-weight:700;color:#1a3a6b;margin-bottom:${bx.sub ? 54 : 64}px">${bx.title}${bx.sub ? `<br><span style="font-weight:400;font-size:8pt">(${bx.sub})</span>` : ''}</div><div style="border-top:1px solid #999;margin:0 8px;padding-top:6px;font-size:9.5pt;font-weight:700;min-height:18px">${bx.name || ''}</div></td>`).join('')}</tr></table>
   </div>`;
 }
 
@@ -93,7 +94,7 @@ function downloadSchedulePDF(mode = 'both') {
   const unitGroups = {};
   filtered.forEach(s => { const u = s.unit || '(Tanpa Unit)'; (unitGroups[u]=unitGroups[u]||[]).push(s); });
 
-  const curYear  = new Date().getFullYear();
+  const curYear  = Number(document.getElementById('dlpdf-year')?.value) || new Date().getFullYear();   // tahun rencana yang dicetak
   const printDate = new Date().toLocaleDateString('id-ID',{day:'2-digit',month:'long',year:'numeric'});
   const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -104,29 +105,18 @@ function downloadSchedulePDF(mode = 'both') {
     return reports.some(r => {
       if (!r.date) return false;
       const rd = new Date(r.date);
-      if (rd.getMonth() + 1 !== m) return false;
+      if (rd.getFullYear() !== curYear || rd.getMonth() + 1 !== m) return false;
       const rWeek = parseInt(r.week) || getWeekOfMonth(rd);
       if (rWeek !== w) return false;
       if (sTag  && r.tagNo && r.tagNo.trim().toLowerCase() === sTag) return true;
       return (r.equipmentName||'').trim().toLowerCase() === sName && (r.unit||'').trim().toLowerCase() === sUnit;
     });
   }
-  function hasPlan(s, m, w) {
-    const sMonth = parseInt(s.month) || 0;
-    const sWeek  = parseInt(s.week)  || 1;
-    if (!sMonth) return false;
-    if (s.periode === 'Monthly')     return sMonth === m && sWeek === w;
-    if (s.periode === 'Weekly')      return sWeek === w;
-    if (s.periode === 'Daily')       return true;
-    if (s.periode === 'Quarterly')   return ((m - sMonth) % 3 === 0) && m >= sMonth && sWeek === w;
-    if (s.periode === 'Semi-Annual') return ((m - sMonth) % 6 === 0) && m >= sMonth && sWeek === w;
-    if (s.periode === 'Annual')      return sMonth === m && sWeek === w;
-    return sMonth === m && sWeek === w;
-  }
+  function hasPlan(s, m, w) { return isPlannedAt(s, curYear, m, w); }   // rencana tanggal (atau pola lama) — 23-plan.js
 
   const weeksPerMonth = Array(12).fill(4);
-  filtered.forEach(s => { const sMonth=parseInt(s.month), sWeek=parseInt(s.week); if (sMonth>=1 && sMonth<=12 && sWeek>weeksPerMonth[sMonth-1]) weeksPerMonth[sMonth-1]=sWeek; });
-  reports.forEach(r => { if (!r.date) return; const rd=new Date(r.date); const m=rd.getMonth(); const w=parseInt(r.week)||getWeekOfMonth(rd); if (w>weeksPerMonth[m]) weeksPerMonth[m]=w; });
+  filtered.forEach(s => { for (let m = 1; m <= 12; m++) plannedWeeksInMonth(s, curYear, m).forEach(w => { if (w > weeksPerMonth[m-1]) weeksPerMonth[m-1] = w; }); });
+  reports.forEach(r => { if (!r.date) return; const rd=new Date(r.date); if (rd.getFullYear() !== curYear) return; const m=rd.getMonth(); const w=parseInt(r.week)||getWeekOfMonth(rd); if (w>weeksPerMonth[m]) weeksPerMonth[m]=w; });
   weeksPerMonth.forEach((w,i) => { if (w < 4) weeksPerMonth[i] = 4; });
 
   let monthHeaderRow = '<tr>';
@@ -188,7 +178,7 @@ function downloadSchedulePDF(mode = 'both') {
     });
 
     const countRow = buildCountRow(items);
-    allTablesHTML += _buildApprovalPageHTML(unitName, isPlanningOnly);
+    allTablesHTML += _buildApprovalPageHTML(unitName, isPlanningOnly, curYear);
     allTablesHTML += `
       <div style="page-break-before:always;margin-bottom:24px">
         <div style="background:#1a3a6b;color:#fff;padding:6px 10px;font-size:9pt;font-weight:700;border-radius:3px 3px 0 0;display:flex;align-items:center;justify-content:space-between">
@@ -218,7 +208,7 @@ function downloadSchedulePDF(mode = 'both') {
 
   const fullHTML = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8">
 <title>PM ${modeLabel} ${curYear} — ${unitLabel}</title>
-<style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A3 landscape;margin:8mm 10mm}body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#111;background:#fff}table{border-collapse:collapse;width:100%}tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}img{max-width:100%}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none}}</style>
+<style>*{box-sizing:border-box;margin:0;padding:0}@page{size:A3 landscape;margin:8mm 10mm}body{font-family:Arial,Helvetica,sans-serif;font-size:8pt;color:#111;background:#fff}table{border-collapse:collapse;width:100%}tr{page-break-inside:avoid;break-inside:avoid}thead{display:table-header-group}img{max-width:100%}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print{display:none !important}}</style>
 </head><body>
 <div class="no-print" style="padding:10px;background:#f4f7f4;border-bottom:2px solid #1a3a6b;display:flex;align-items:center;gap:12px">
   <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">🖨 PRINT / SAVE AS PDF</button>
@@ -460,7 +450,7 @@ async function downloadCompletionReportPDF(unitF = '', areaF = '') {
 .hdr-bar{background:#1a3a6b;color:#fff;padding:10px 14px;border-radius:4px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.kpi{border:1px solid #ccc;border-radius:5px;padding:10px 14px;text-align:center}.kpi-val{font-size:20pt;font-weight:900;color:#1a3a6b}.kpi-lbl{font-size:7.5pt;color:#777;text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
 .section-title{font-size:9.5pt;font-weight:800;color:#1a3a6b;margin:14px 0 8px;padding-bottom:4px;border-bottom:2px solid #1a3a6b;text-transform:uppercase;letter-spacing:.03em}.unit-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:6px}
 .legend-bar{display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:7px 12px;background:#f4f7f4;border:1px solid #ccc;border-radius:4px;font-size:7.5pt}.footer{margin-top:10px;padding:5px 0;font-size:7pt;color:#aaa;border-top:1px solid #eee;text-align:center}
-@media print{.no-print{display:none}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.unit-card-grid,table{page-break-inside:avoid}}</style></head><body>
+@media print{.no-print{display:none !important}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}.unit-card-grid,table{page-break-inside:avoid}}</style></head><body>
 <div class="no-print" style="padding:10px;background:#f4f7f4;border-bottom:2px solid #1a3a6b;display:flex;align-items:center;gap:12px;margin-bottom:14px">
   <button onclick="window.print()" style="background:#1a3a6b;color:#fff;border:none;padding:8px 18px;border-radius:5px;font-size:12px;font-weight:700;cursor:pointer">🖨 PRINT / SAVE AS PDF</button>
   <span style="font-size:11px;color:#666">💡 % dihitung dari Planning Month + Status Closed (bukan tanggal laporan)</span>

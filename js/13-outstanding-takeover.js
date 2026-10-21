@@ -275,6 +275,7 @@ function executeTakeover(schedId) {
   if (!newMonth || !newWeek) { toast('Pilih bulan dan minggu tujuan','error'); return; }
 
   const oldMonth = s.month, oldWeek = s.week;
+  planTakeover(s, newMonth, newWeek);
   s.month = newMonth; s.week = newWeek;
   s.takeoverAt = new Date().toISOString();
   s.updatedAt  = s.takeoverAt;
@@ -322,6 +323,7 @@ function bulkTakeover() {
   document.getElementById('delete-confirm-btn').onclick = () => {
     toTakeover.forEach(s => {
       const oldMonth = s.month, oldWeek = s.week;
+      planTakeover(s, curMonth, curWeek);
       s.month = curMonth; s.week = curWeek;
       s.takeoverAt = new Date().toISOString();
       s.updatedAt  = s.takeoverAt;

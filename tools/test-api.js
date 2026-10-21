@@ -17,6 +17,13 @@ process.env.APP_ACCESS_KEY = 'test-key-123456';
 
 // ── Turso palsu: /v2/pipeline di atas SQLite in-memory ──
 const db = new DatabaseSync(':memory:');
+// Skema lama (sebelum plan / pmNo / photos ada) + satu baris data lama: migrasi harus menambah kolom TANPA menghapus data.
+db.exec(`CREATE TABLE schedules (id TEXT PRIMARY KEY, unit TEXT NOT NULL DEFAULT '', area TEXT NOT NULL DEFAULT '', equipment TEXT NOT NULL DEFAULT '', tagNo TEXT NOT NULL DEFAULT '', equipmentType TEXT NOT NULL DEFAULT '', periode TEXT NOT NULL DEFAULT 'Monthly', month INTEGER, week INTEGER, pic TEXT NOT NULL DEFAULT '', lastDone TEXT NOT NULL DEFAULT '', mp INTEGER, hari INTEGER, notes TEXT NOT NULL DEFAULT '', startDate TEXT NOT NULL DEFAULT '', takeoverAt TEXT, takeoverFrom TEXT, takeoverReason TEXT, createdAt TEXT NOT NULL, updatedAt TEXT NOT NULL, deletedAt TEXT, updatedBy TEXT, serverAt TEXT NOT NULL);
+CREATE TABLE reports (id TEXT PRIMARY KEY, tagNo TEXT NOT NULL DEFAULT '', date TEXT NOT NULL DEFAULT '', equipmentType TEXT NOT NULL DEFAULT '', equipmentName TEXT NOT NULL DEFAULT '', unit TEXT NOT NULL DEFAULT '', area TEXT NOT NULL DEFAULT '', periode TEXT NOT NULL DEFAULT '', week INTEGER, month INTEGER, teknisi TEXT NOT NULL DEFAULT '', approval TEXT NOT NULL DEFAULT '', notes TEXT NOT NULL DEFAULT '', ppe TEXT NOT NULL DEFAULT '{}', aktivitas TEXT NOT NULL DEFAULT '[]', spareParts TEXT NOT NULL DEFAULT '[]', submittedAt TEXT, updatedAt TEXT NOT NULL, deletedAt TEXT, updatedBy TEXT, serverAt TEXT NOT NULL);
+CREATE TABLE signatures (pmId TEXT PRIMARY KEY, tagNo TEXT NOT NULL DEFAULT '', equipmentName TEXT NOT NULL DEFAULT '', tanggal TEXT NOT NULL DEFAULT '', spvName TEXT NOT NULL DEFAULT '', spvSignature TEXT NOT NULL DEFAULT '', spvSignedAt TEXT NOT NULL DEFAULT '', leaderName TEXT NOT NULL DEFAULT '', leaderSignature TEXT NOT NULL DEFAULT '', leaderSignedAt TEXT NOT NULL DEFAULT '', updatedAt TEXT NOT NULL, updatedBy TEXT, serverAt TEXT NOT NULL);
+INSERT INTO signatures (pmId, spvName, updatedAt, serverAt) VALUES ('PM-OLD', 'Leader Lama', '2026-03-10T00:00:00.000Z', '2026-03-10T00:00:00.000Z');
+INSERT INTO schedules (id, equipment, createdAt, updatedAt, serverAt, month, week) VALUES ('SCH-OLD', 'Mesin Lama', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z', 3, 2);
+INSERT INTO reports (id, equipmentName, date, updatedAt, serverAt) VALUES ('PM-OLD', 'Mesin Lama', '2026-03-10', '2026-03-10T00:00:00.000Z', '2026-03-10T00:00:00.000Z');`);
 const toVal = v => v === null || v === undefined ? { type: 'null' } : typeof v === 'number' ? { type: 'integer', value: String(v) } : { type: 'text', value: String(v) };
 global.fetch = async (url, init) => {
   const body = JSON.parse(init.body);
@@ -154,6 +161,94 @@ const t = async (name, fn) => { try { await fn(); passed++; console.log('  ✓',
     const old = cs.find(s => s.tagNo === 'TAG-449');
     assert.equal(old.id, 'SCH-410'); assert.equal(old.periode, 'Quarterly'); assert.equal(old.notes, 'catatan lama'); assert.equal(old.month, 6);
     global.fetch = realFetch;
+  });
+
+  // ── Migrasi kolom + rencana tanggal (plan) + nomor PM (pmNo) + foto ──
+  await t('migrasi: kolom plan/pmNo/photos ditambahkan ke DB lama, data lama tetap utuh', async () => {
+    const cols = tbl => db.prepare(`SELECT name FROM pragma_table_info('${tbl}')`).all().map(x => x.name);
+    assert.ok(cols('schedules').includes('plan')); assert.ok(cols('reports').includes('pmNo')); assert.ok(cols('reports').includes('photos')); assert.ok(cols('signatures').includes('signers'));
+    assert.equal(db.prepare("SELECT spvName FROM signatures WHERE pmId='PM-OLD'").get().spvName, 'Leader Lama');
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM schedules WHERE id='SCH-OLD'").get().n, 1);
+    assert.equal(db.prepare("SELECT COUNT(*) n FROM reports WHERE id='PM-OLD'").get().n, 1);
+  });
+
+  await t('plan: round-trip, tanggal tidak valid / beda tahun dibuang, diurutkan & unik', async () => {
+    const s = { id: 'SCH-PLAN', unit: 'U', area: 'A', equipment: 'Eq Plan', periode: 'Quarterly', month: 6, week: 2,
+      plan: { '2026': ['2026-09-08', '2026-06-08', '2026-06-08', '2026-02-30', '2027-01-05', 'bukan-tanggal'], '2027': ['2027-03-01'], 'abc': ['2026-01-01'] },
+      updatedAt: '2026-06-01T00:00:00.000Z' };
+    assert.equal((await call('saveSchedule', { schedule: s })).success, true);
+    const got = (await call('getSchedules')).schedules.find(x => x.id === 'SCH-PLAN');
+    assert.deepEqual(JSON.parse(got.plan), { '2026': ['2026-06-08', '2026-09-08'], '2027': ['2027-03-01'] });
+  });
+
+  await t('plan: klien lama (tanpa plan) tidak menghapus rencana yang tersimpan', async () => {
+    const s = { id: 'SCH-PLAN', unit: 'U', area: 'A', equipment: 'Eq Plan (edit klien lama)', periode: 'Quarterly', month: 6, week: 2, updatedAt: '2026-06-02T00:00:00.000Z' };
+    await call('saveSchedule', { schedule: s });
+    const got = (await call('getSchedules')).schedules.find(x => x.id === 'SCH-PLAN');
+    assert.equal(got.equipment, 'Eq Plan (edit klien lama)');
+    assert.deepEqual(JSON.parse(got.plan), { '2026': ['2026-06-08', '2026-09-08'], '2027': ['2027-03-01'] });
+  });
+
+  await t('plan: object kosong {} mengosongkan rencana (hapus eksplisit)', async () => {
+    const s = { id: 'SCH-PLAN', unit: 'U', area: 'A', equipment: 'Eq Plan', periode: 'Quarterly', month: 6, week: 2, plan: {}, updatedAt: '2026-06-03T00:00:00.000Z' };
+    await call('saveSchedule', { schedule: s });
+    assert.equal((await call('getSchedules')).schedules.find(x => x.id === 'SCH-PLAN').plan, '{}');
+  });
+
+  await t('plan: 29 Februari hanya valid di tahun kabisat; satu tahun penuh (365 hari) diterima', async () => {
+    const full = []; for (let d = 0; d < 365; d++) full.push(new Date(Date.UTC(2026, 0, 1 + d)).toISOString().slice(0, 10));
+    await call('saveSchedule', { schedule: { id: 'SCH-LEAP', unit: 'U', area: 'A', equipment: 'Leap', plan: { '2026': full, '2028': ['2028-02-29'] }, updatedAt: '2026-06-03T00:00:00.000Z' } });
+    await call('saveSchedule', { schedule: { id: 'SCH-LEAP2', unit: 'U', area: 'A', equipment: 'Leap2', plan: { '2026': ['2026-02-29'], '2028': ['2028-02-29'] }, updatedAt: '2026-06-03T00:00:00.000Z' } });
+    const all = (await call('getSchedules')).schedules;
+    assert.equal(JSON.parse(all.find(x => x.id === 'SCH-LEAP').plan)['2026'].length, 365);
+    assert.deepEqual(JSON.parse(all.find(x => x.id === 'SCH-LEAP2').plan), { '2028': ['2028-02-29'] });
+  });
+
+  await t('pmNo & foto: round-trip; URL non-https dibuang; klien lama tidak menghapus', async () => {
+    const base = { id: 'PM-NO-1', tagNo: 'T-9', date: '2026-10-01', equipmentName: 'Eq Foto', unit: 'U', area: 'A', periode: 'Monthly', teknisi: 'X',
+      aktivitas: [{ no: 1, uraian: 'u', yes: true }], updatedAt: '2026-10-01T00:00:00.000Z' };
+    const photos = [{ url: 'https://foto.contoh.id/a/1.jpg', caption: 'Sebelum', name: '1.jpg', at: '2026-10-01T01:00:00.000Z' },
+      { url: 'http://tidak-aman.id/2.jpg', caption: 'x' }, { url: 'javascript:alert(1)' }, { url: 'https://foto.contoh.id/a/3.jpg', caption: '<b>"x"</b>' }];
+    assert.equal((await call('saveReport', { report: { ...base, pmNo: 2, photos } })).success, true);
+    let got = (await call('getReports')).reports.find(x => x.id === 'PM-NO-1');
+    assert.equal(got.pmNo, 2);
+    const ph = JSON.parse(got.photos);
+    assert.deepEqual(ph.map(p => p.url), ['https://foto.contoh.id/a/1.jpg', 'https://foto.contoh.id/a/3.jpg']);
+    assert.ok(!/[<>"]/.test(ph[1].caption), 'caption dinetralkan');
+    // klien lama menyimpan ulang tanpa pmNo/photos → tetap utuh
+    await call('saveReport', { report: { ...base, notes: 'diedit klien lama', updatedAt: '2026-10-02T00:00:00.000Z' } });
+    got = (await call('getReports')).reports.find(x => x.id === 'PM-NO-1');
+    assert.equal(got.notes, 'diedit klien lama'); assert.equal(got.pmNo, 2); assert.equal(JSON.parse(got.photos).length, 2);
+  });
+
+  await t('pmNo: nilai di luar batas dipotong ke 1..999, foto >12 dipotong', async () => {
+    const base = { id: 'PM-NO-2', tagNo: 'T-10', date: '2026-10-01', equipmentName: 'Eq 2', unit: 'U', area: 'A', updatedAt: '2026-10-01T00:00:00.000Z' };
+    const photos = Array.from({ length: 20 }, (_, i) => ({ url: 'https://foto.contoh.id/' + i + '.jpg' }));
+    await call('saveReport', { report: { ...base, pmNo: 5000, photos } });
+    const got = (await call('getReports')).reports.find(x => x.id === 'PM-NO-2');
+    assert.equal(got.pmNo, 999); assert.equal(JSON.parse(got.photos).length, 12);
+  });
+
+  // ── Pengesahan 4 penanda tangan (Unit Malang): signatures.signers ──
+  const PIXEL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  await t('signers: 4 peran tersimpan & terbaca (nama + TTD + waktu); peran asing diabaikan', async () => {
+    const signers = { execute: { name: 'Teknisi A', sig: PIXEL, at: '2026-10-01T01:00:00.000Z' }, checked: { name: 'Spv B', sig: PIXEL }, review: { name: 'Mgr C' },
+      approved: { name: 'Marrio Dwi Oktavianto', sig: PIXEL }, hacker: { name: 'x', sig: PIXEL } };
+    const r = await call('saveSignature', { signature: { pmId: 'PM-MLG-1', tagNo: 'T', equipmentName: 'E', tanggal: '2026-10-01', signers, updatedAt: '2026-10-01T02:00:00.000Z' } });
+    assert.equal(r.success, true);
+    const got = (await call('getSignatures')).signatures.find(x => x.pmId === 'PM-MLG-1');
+    const s = JSON.parse(got.signers);
+    assert.deepEqual(Object.keys(s), ['execute', 'checked', 'review', 'approved']);
+    assert.equal(s.approved.name, 'Marrio Dwi Oktavianto'); assert.equal(s.approved.sig, PIXEL); assert.equal(s.review.sig, '');
+  });
+  await t('signers: gambar bukan PNG ditolak (400)', async () => {
+    const r = await call('saveSignature', { signature: { pmId: 'PM-MLG-2', signers: { execute: { name: 'A', sig: 'data:image/jpeg;base64,AAAA' } }, updatedAt: '2026-10-01T02:00:00.000Z' } });
+    assert.equal(r.status, 400);
+  });
+  await t('signers: klien lama (tanpa signers) tidak menghapus TTD multi-penanda-tangan', async () => {
+    await call('saveSignature', { signature: { pmId: 'PM-MLG-1', spvName: 'Leader X', updatedAt: '2026-10-02T02:00:00.000Z' } });
+    const got = (await call('getSignatures')).signatures.find(x => x.pmId === 'PM-MLG-1');
+    assert.equal(got.spvName, 'Leader X'); assert.equal(JSON.parse(got.signers).approved.name, 'Marrio Dwi Oktavianto');
   });
 
   console.log(`\n${passed} tes lolos${process.exitCode ? ', ADA YANG GAGAL' : ''}`);

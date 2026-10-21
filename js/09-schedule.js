@@ -1,7 +1,8 @@
 // ════════════════════════════════════════════════════════
 //  SCHEDULE CRUD + TREE LIST
 // ════════════════════════════════════════════════════════
-// preset = { unit, area } dipakai "Tambah Equipment" dari menu Kelola Data Master.
+// preset = { unit, area, year } — unit/area dari "Tambah Equipment" (Pengaturan); year = tahun rencana yang dibuka
+// (dipakai modal Akhiri Tahun). Rencana PM diisi lewat kalender bulanan (lihat 23-plan.js).
 function openScheduleModal(editId = null, preset = {}) {
   document.getElementById('sch-edit-id').value = editId || '';
   const now = new Date();
@@ -15,12 +16,13 @@ function openScheduleModal(editId = null, preset = {}) {
     document.getElementById('sch-tagno').value = s.tagNo||'';
     document.getElementById('sch-eq-type').value = s.equipmentType||'';
     document.getElementById('sch-periode').value = s.periode||'Monthly';
-    document.getElementById('sch-month').value = s.month||now.getMonth()+1;
+    document.getElementById('sch-month').value = s.month||now.getMonth()+1;   // turunan dari kalender; dipakai bila jadwal lama belum punya tanggal
     document.getElementById('sch-week').value = s.week||1;
     document.getElementById('sch-pic').value = s.pic||'';
     document.getElementById('sch-last-done').value = s.lastDone||'';
     document.getElementById('sch-mp').value = s.mp||'';
     document.getElementById('sch-hari').value = s.hari||'';
+    schPlanInit(s, preset.year);
     document.getElementById('sch-notes').value = s.notes||'';
   } else {
     document.getElementById('schModalTitle').textContent = 'Tambah Schedule PM';
@@ -30,6 +32,7 @@ function openScheduleModal(editId = null, preset = {}) {
     document.getElementById('sch-month').value=now.getMonth()+1;
     document.getElementById('sch-week').value=getWeekOfMonth(now);
     document.getElementById('sch-last-done').value='';
+    schPlanInit(null, preset.year);
     if (preset.unit) document.getElementById('sch-unit').value = preset.unit;
     if (preset.area) document.getElementById('sch-area').value = preset.area;
   }
@@ -42,14 +45,21 @@ async function saveSchedule() {
   const area = document.getElementById('sch-area').value.trim();
   const equipment = document.getElementById('sch-equipment').value.trim();
   const periode = document.getElementById('sch-periode').value;
-  const month = parseInt(document.getElementById('sch-month').value);
-  const week = parseInt(document.getElementById('sch-week').value);
+  const editId = document.getElementById('sch-edit-id').value;
+
+  // Rencana PM dari kalender. Bulan / minggu / hari kerja diturunkan dari tanggal pertama.
+  const plan = schPlanGet();
+  const derived = derivePlanFields(plan);
+  let month = parseInt(document.getElementById('sch-month').value);
+  let week = parseInt(document.getElementById('sch-week').value);
+  let hari = document.getElementById('sch-hari').value ? parseInt(document.getElementById('sch-hari').value) : '';
+  if (derived) { month = derived.month; week = derived.week; hari = derived.hari; }
+  else if (!editId) { toast('Pilih minimal satu tanggal PM di kalender','error'); return; }   // jadwal baru wajib punya tanggal; jadwal lama boleh tetap memakai bulan + minggu lamanya
 
   if (!unit || !area || !equipment || !periode || !month || !week) {
-    toast('Isi field wajib: Unit, Area, Nama Equipment, Periode, Bulan, Minggu','error');
+    toast('Isi field wajib: Unit, Area, Nama Equipment, Periode, dan tanggal PM','error');
     return;
   }
-  const editId = document.getElementById('sch-edit-id').value;
 
   // FIX: preserve startDate asli saat edit, jangan dioverwrite ke hari ini
   let originalStartDate = todayISO();
@@ -60,13 +70,13 @@ async function saveSchedule() {
 
   const item = {
     id: editId || genId(),
-    unit, area, equipment, periode, month, week,
+    unit, area, equipment, periode, month, week, plan,
     tagNo: document.getElementById('sch-tagno').value.trim(),
     equipmentType: document.getElementById('sch-eq-type').value,
     pic: document.getElementById('sch-pic').value.trim(),
     lastDone: document.getElementById('sch-last-done').value,
     mp: document.getElementById('sch-mp').value ? parseInt(document.getElementById('sch-mp').value) : '',
-    hari: document.getElementById('sch-hari').value ? parseInt(document.getElementById('sch-hari').value) : '',
+    hari,
     notes: document.getElementById('sch-notes').value.trim(),
     startDate: originalStartDate,
     updatedAt: new Date().toISOString()
@@ -86,6 +96,7 @@ async function saveSchedule() {
   populateUnitFilters();
   updateSidebarBadges();
   toast(editId?'Schedule diperbarui':'Schedule ditambahkan','success');
+  if (document.getElementById('yearEndOverlay')?.classList.contains('open')) yeRender();   // daftar Akhiri Tahun ikut diperbarui
 
   if (backendEnabled()) {
     // Backend Turso memakai UPSERT, jadi tambah & edit sama-sama 'saveSchedule'.
@@ -247,8 +258,11 @@ function renderScheduleList() {
             ? `<span style="color:var(--orange);font-size:11px;font-weight:600">◎ ${diffDays} hari lagi</span>`
             : `<span style="color:var(--green);font-size:11px">✓ On Track</span>`;
           const locked = isLockedByOther(s.id);
+          const pmCnt = pmCountThisYear(s);
           const eksekusiBtn = locked
             ? `<button class="tbl-btn" disabled title="Sedang dikerjakan teknisi lain">🔒 Dikerjakan</button>`
+            : pmCnt > 0
+            ? `<button class="tbl-btn" style="border-color:rgba(43,108,184,.45);color:var(--blue);font-weight:600" onclick="eksekusiPM('${s.id}')" title="Sudah di-PM ${pmCnt}× tahun ini — nomor PM akan melanjutkan">↻ PM Lagi (ke-${pmCnt + 1})</button>`
             : `<button class="tbl-btn" style="border-color:rgba(74,158,63,.4);color:var(--green2);font-weight:600" onmouseover="this.style.background='rgba(74,158,63,.08)'" onmouseout="this.style.background=''" onclick="eksekusiPM('${s.id}')">▶ Eksekusi</button>`;
 
           html += `<div class="tree-eq-row ${locked?'locked':''}">
@@ -257,6 +271,7 @@ function renderScheduleList() {
               <div style="font-weight:600">${s.equipment} ${lockBadgeHTML(s.id)}</div>
               <div style="font-size:11px;color:var(--text3);margin-top:2px">
                 <span class="badge ${periodeBadge}" style="font-size:9px;padding:1px 6px">${s.periode}</span>
+                ${pmCnt > 0 ? `<span class="badge b-done" style="font-size:9px;padding:1px 6px;margin-left:4px">PM ${pmCnt}× ${new Date().getFullYear()}</span>` : ''}
                 ${s.tagNo?`<span style="margin-left:4px">${s.tagNo}</span>`:''}
                 ${s.pic?`<span style="margin-left:6px">👤 ${s.pic}</span>`:''}
               </div>
@@ -264,7 +279,7 @@ function renderScheduleList() {
             <div class="tree-eq-meta">
               <div style="text-align:right;font-size:11px">
                 <div>${statusTxt}</div>
-                <div style="color:var(--text3);margin-top:2px">📅 ${MONTHS_ID[(s.month||1)-1]} W${s.week||'?'} · Next: ${nextFmt}</div>
+                <div style="color:var(--text3);margin-top:2px">📅 ${hasExplicitPlan(s, new Date().getFullYear()) ? planSummary(s, new Date().getFullYear()) : (MONTHS_ID[(s.month||1)-1] + ' W' + (s.week||'?'))} · Next: ${nextFmt}</div>
                 <div style="color:var(--text3)">Terakhir: ${lastFmt}</div>
               </div>
               <div style="display:flex;flex-direction:column;gap:3px;flex-shrink:0">

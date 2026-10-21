@@ -70,6 +70,7 @@ const SCHEMA = [
     mp             INTEGER,
     hari           INTEGER,
     notes          TEXT NOT NULL DEFAULT '',
+    plan           TEXT,
     startDate      TEXT NOT NULL DEFAULT '',
     takeoverAt     TEXT,
     takeoverFrom   TEXT,
@@ -97,6 +98,8 @@ const SCHEMA = [
     ppe            TEXT NOT NULL DEFAULT '{}',
     aktivitas      TEXT NOT NULL DEFAULT '[]',
     spareParts     TEXT NOT NULL DEFAULT '[]',
+    pmNo           INTEGER,
+    photos         TEXT,
     submittedAt    TEXT,
     updatedAt      TEXT NOT NULL,
     deletedAt      TEXT,
@@ -114,6 +117,7 @@ const SCHEMA = [
     leaderName      TEXT NOT NULL DEFAULT '',
     leaderSignature TEXT NOT NULL DEFAULT '',
     leaderSignedAt  TEXT NOT NULL DEFAULT '',
+    signers         TEXT,
     updatedAt       TEXT NOT NULL,
     updatedBy       TEXT,
     serverAt        TEXT NOT NULL
@@ -156,12 +160,12 @@ const SCHEMA = [
 ];
 
 const SCHEDULE_COLS = ['id','unit','area','equipment','tagNo','equipmentType','periode','month','week','pic',
-  'lastDone','mp','hari','notes','startDate','takeoverAt','takeoverFrom','takeoverReason',
+  'lastDone','mp','hari','notes','plan','startDate','takeoverAt','takeoverFrom','takeoverReason',
   'createdAt','updatedAt','deletedAt','updatedBy','serverAt'];
 const REPORT_COLS = ['id','tagNo','date','equipmentType','equipmentName','unit','area','periode','week','month',
-  'teknisi','approval','notes','ppe','aktivitas','spareParts','submittedAt','updatedAt','deletedAt','updatedBy','serverAt'];
+  'teknisi','approval','notes','ppe','aktivitas','spareParts','pmNo','photos','submittedAt','updatedAt','deletedAt','updatedBy','serverAt'];
 const SIGNATURE_COLS = ['pmId','tagNo','equipmentName','tanggal','spvName','spvSignature','spvSignedAt',
-  'leaderName','leaderSignature','leaderSignedAt','updatedAt','updatedBy','serverAt'];
+  'leaderName','leaderSignature','leaderSignedAt','signers','updatedAt','updatedBy','serverAt'];
 const TEMPLATE_COLS = ['equipmentType','items','updatedAt','updatedBy','serverAt'];
 const MASTER_COLS = ['kind','data','updatedAt','updatedBy','serverAt'];
 const MASTER_KINDS = ['units', 'eqtypes'];
@@ -169,17 +173,20 @@ const MASTER_KINDS = ['units', 'eqtypes'];
 // UPSERT dengan penjaga "yang lebih baru menang": baris di server hanya
 // ditimpa kalau updatedAt kiriman >= yang tersimpan, dan record yang sudah
 // dihapus tidak hidup lagi oleh kiriman lama dari antrian offline.
-function upsertSql(table, cols, pk, { keep = [], softDelete = false } = {}) {
-  const sets = cols.filter(c => c !== pk && !keep.includes(c)).map(c => `${c} = excluded.${c}`).join(', ');
+function upsertSql(table, cols, pk, { keep = [], softDelete = false, optional = [] } = {}) {
+  // optional: kolom yang ditambahkan belakangan (plan, pmNo, photos). Klien versi lama tidak mengirimnya (NULL)
+  // → nilai yang sudah tersimpan DIPERTAHANKAN, bukan dihapus.
+  const sets = cols.filter(c => c !== pk && !keep.includes(c))
+    .map(c => optional.includes(c) ? `${c} = COALESCE(excluded.${c}, ${table}.${c})` : `${c} = excluded.${c}`).join(', ');
   let guard = `excluded.updatedAt >= ${table}.updatedAt`;
   if (softDelete) guard += ` AND (${table}.deletedAt IS NULL OR excluded.updatedAt > ${table}.deletedAt)`;
   return `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${cols.map(() => '?').join(', ')})
           ON CONFLICT(${pk}) DO UPDATE SET ${sets} WHERE ${guard}`;
 }
 const SQL = {
-  upsertSchedule:  upsertSql('schedules',  SCHEDULE_COLS,  'id',            { keep: ['createdAt'], softDelete: true }),
-  upsertReport:    upsertSql('reports',    REPORT_COLS,    'id',            { softDelete: true }),
-  upsertSignature: upsertSql('signatures', SIGNATURE_COLS, 'pmId'),
+  upsertSchedule:  upsertSql('schedules',  SCHEDULE_COLS,  'id',            { keep: ['createdAt'], softDelete: true, optional: ['plan'] }),
+  upsertReport:    upsertSql('reports',    REPORT_COLS,    'id',            { softDelete: true, optional: ['pmNo', 'photos'] }),
+  upsertSignature: upsertSql('signatures', SIGNATURE_COLS, 'pmId', { optional: ['signers'] }),
   upsertTemplate:  upsertSql('templates',  TEMPLATE_COLS,  'equipmentType'),
   // Master data bersifat tambah-saja dan digabung (union) di server sebelum ditulis,
   // jadi urutan tulis dari beberapa perangkat tidak boleh menghapus entri.
@@ -228,10 +235,36 @@ async function runPipeline(stmts) {
 }
 const query = async (sql, args) => (await runPipeline([{ sql, args }]))[0];
 
+// Database lama dibuat sebelum kolom plan / pmNo / photos ada. CREATE TABLE IF NOT EXISTS tidak menambah kolom,
+// jadi kolom yang belum ada ditambahkan lewat ALTER TABLE (aman diulang; nama tabel/kolom konstanta, bukan input).
+const MIGRATIONS = [
+  ['schedules', 'plan', 'TEXT'],
+  ['reports', 'pmNo', 'INTEGER'],
+  ['reports', 'photos', 'TEXT'],
+  ['signatures', 'signers', 'TEXT'],
+];
+async function migrateColumns() {
+  const tables = [...new Set(MIGRATIONS.map(m => m[0]))];
+  let todo;
+  try {
+    const infos = await runPipeline(tables.map(t => ({ sql: `SELECT name FROM pragma_table_info('${t}')` })));
+    const have = Object.fromEntries(tables.map((t, i) => [t, new Set(infos[i].rows.map(r => r.name))]));
+    todo = MIGRATIONS.filter(([t, c]) => !have[t].has(c));
+  } catch (e) {
+    // Cadangan: bila pragma_table_info tidak tersedia, coba tambah semua kolom satu per satu dan abaikan "sudah ada".
+    console.warn('[api/db] pragma_table_info gagal, memakai jalur cadangan:', e.message);
+    todo = MIGRATIONS;
+  }
+  for (const [t, c, type] of todo) {
+    try { await runPipeline([{ sql: `ALTER TABLE ${t} ADD COLUMN ${c} ${type}` }]); }
+    catch (e) { if (!/duplicate column/i.test(e.message)) throw e; }
+  }
+}
+
 let _schemaReady = null;
 function ensureSchema() {
   if (!_schemaReady) {
-    _schemaReady = runPipeline(SCHEMA.map(sql => ({ sql }))).catch(e => { _schemaReady = null; throw e; });
+    _schemaReady = runPipeline(SCHEMA.map(sql => ({ sql }))).then(migrateColumns).catch(e => { _schemaReady = null; throw e; });
   }
   return _schemaReady;
 }
@@ -301,6 +334,62 @@ function jsonField(v, kind, maxItems, maxBytes) {
   if (out.length > maxBytes) throw bad('data terlalu besar');
   return out;
 }
+// plan = { "2026": ["2026-06-08", ...], "2027": [...] } — rencana tanggal PM per tahun.
+// undefined/null → null (kolom tidak diubah); object kosong {} → rencana dikosongkan.
+function validIsoDate(d, year) {
+  if (typeof d !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  if (year && d.slice(0, 4) !== year) return false;
+  const t = new Date(d + 'T00:00:00Z');
+  return !isNaN(t.getTime()) && t.toISOString().slice(0, 10) === d;
+}
+function planField(v) {
+  if (v === undefined || v === null || v === '') return null;
+  let o = v;
+  if (typeof v === 'string') { try { o = JSON.parse(v); } catch { throw bad('plan rusak'); } }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad('plan harus object');
+  const out = {};
+  for (const [year, arr] of Object.entries(o)) {
+    if (!/^20\d\d$/.test(year) || !Array.isArray(arr)) continue;
+    const dates = [...new Set(arr.filter(d => validIsoDate(d, year)))].sort();
+    if (dates.length > 400) throw bad('maksimal 400 tanggal per tahun');
+    if (dates.length) out[year] = dates;
+  }
+  if (Object.keys(out).length > 8) throw bad('maksimal 8 tahun rencana');
+  return JSON.stringify(out);
+}
+
+// photos = [{ url, caption, name, at }] — hanya URL https (dan, bila PHOTO_BASE_URL diset, hanya dari server foto itu).
+const PHOTO_BASE = (process.env.PHOTO_BASE_URL || '').trim();
+function photosField(v) {
+  if (v === undefined || v === null || v === '') return null;
+  let a = v;
+  if (typeof v === 'string') { try { a = JSON.parse(v); } catch { throw bad('foto rusak'); } }
+  if (!Array.isArray(a)) throw bad('foto harus array');
+  const out = [];
+  for (const p of a.slice(0, 12)) {
+    const url = p && typeof p.url === 'string' ? p.url.trim() : '';
+    if (!/^https:\/\/[^\s<>"']{3,480}$/.test(url)) continue;
+    if (PHOTO_BASE && !url.startsWith(PHOTO_BASE)) continue;
+    out.push({ url, caption: text(p.caption, 200), name: text(p.name, 100), at: p.at ? stamp(p.at, new Date().toISOString()) : '' });
+  }
+  return JSON.stringify(out);
+}
+// signers = { execute|checked|review|approved: { name, sig(PNG data URL), at } } — pengesahan multi-penanda-tangan (Unit Malang).
+const SIGNER_ROLES = ['execute', 'checked', 'review', 'approved'];
+function signersField(v, nowIso) {
+  if (v === undefined || v === null || v === '') return null;
+  let o = v;
+  if (typeof v === 'string') { try { o = JSON.parse(v); } catch { throw bad('signers rusak'); } }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad('signers harus object');
+  const out = {};
+  for (const role of SIGNER_ROLES) {
+    const x = o[role];
+    if (!x || typeof x !== 'object') continue;
+    const name = text(x.name, 100), sig = png(x.sig || x.signature || ''), at = x.at ? stamp(x.at, nowIso) : '';
+    if (name || sig) out[role] = { name, sig, at };
+  }
+  return JSON.stringify(out);
+}
 function png(v) {
   if (!v) return '';
   const s = String(v);
@@ -319,7 +408,7 @@ function normSchedule(s, ctx) {
     tagNo: text(s.tagNo, 60), equipmentType: eqType(s.equipmentType), periode: periode(s.periode),
     month: optInt(s.month, 1, 12), week: optInt(s.week, 1, 6), pic: text(s.pic, 100),
     lastDone: dateStr(s.lastDone), mp: optInt(s.mp, 0, 999), hari: optInt(s.hari, 0, 999),
-    notes: text(s.notes, 2000), startDate: dateStr(s.startDate),
+    notes: text(s.notes, 2000), plan: planField(s.plan), startDate: dateStr(s.startDate),
     takeoverAt: optStamp(s.takeoverAt, ctx.now), takeoverFrom: s.takeoverFrom ? text(s.takeoverFrom, 60) : null,
     takeoverReason: s.takeoverReason ? text(s.takeoverReason, 500) : null,
     createdAt: stamp(s.createdAt || s.startDate || s.updatedAt, ctx.now), updatedAt: stamp(s.updatedAt, ctx.now),
@@ -336,6 +425,7 @@ function normReport(r, ctx) {
     ppe: jsonField(r.ppe, 'object', 0, 2000),
     aktivitas: jsonField(r.aktivitas, 'array', 200, 100000),
     spareParts: jsonField(r.spareParts, 'array', 100, 30000),
+    pmNo: optInt(r.pmNo, 1, 999), photos: photosField(r.photos),
     submittedAt: optStamp(r.submittedAt, ctx.now), updatedAt: stamp(r.updatedAt || r.submittedAt, ctx.now),
     deletedAt: null, updatedBy: ctx.deviceId, serverAt: ctx.now
   };
@@ -346,6 +436,7 @@ function normSignature(s, ctx) {
     pmId: id(s.pmId, 'pmId'), tagNo: text(s.tagNo, 60), equipmentName: text(s.equipmentName, 200), tanggal: dateStr(s.tanggal),
     spvName: text(s.spvName, 100), spvSignature: png(s.spvSignature), spvSignedAt: s.spvSignedAt ? stamp(s.spvSignedAt, ctx.now) : '',
     leaderName: text(s.leaderName, 100), leaderSignature: png(s.leaderSignature), leaderSignedAt: s.leaderSignedAt ? stamp(s.leaderSignedAt, ctx.now) : '',
+    signers: signersField(s.signers, ctx.now),
     updatedAt: stamp(s.updatedAt, ctx.now), updatedBy: ctx.deviceId, serverAt: ctx.now
   };
 }
@@ -649,4 +740,4 @@ module.exports = async function handler(req, res) {
 };
 
 // Diekspor untuk pengujian lokal (tools/test-api.js)
-module.exports._internal = { SCHEMA, normSchedule, normReport, normSignature, normTemplate, normMasterData, neutralize };
+module.exports._internal = { SCHEMA, normSchedule, normReport, normSignature, normTemplate, normMasterData, planField, photosField, signersField, neutralize };
