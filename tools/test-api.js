@@ -155,7 +155,7 @@ const t = async (name, fn) => { try { await fn(); passed++; console.log('  ✓',
     assert.deepEqual([...new Set(reps.map(r => r.equipmentName.slice(0, 14)))].sort(), ['Cold Storage 1', 'Cold Storage 2', 'Cold Storage 3', 'Cold Storage 4']);
     const rcaCount = reps.reduce((n, r) => n + JSON.parse(r.aktivitas).filter(a => a.no_checked && a.rca && a.rca.penyebab).length, 0);
     assert.equal(rcaCount, 6);
-    assert.equal((await call('getTemplates')).templates.cold_storage.length, 12);
+    assert.equal((await call('getTemplates')).templates.cold_storage.length, 13);
     const cs = (await call('getSchedules')).schedules.filter(s => /^Cold Storage [1-4] Mesin [1-5]$/.test(s.equipment) && s.equipmentType === 'cold_storage');
     assert.equal(cs.length, 19, 'harus 19 jadwal mesin, tanpa duplikat');
     const old = cs.find(s => s.tagNo === 'TAG-449');
