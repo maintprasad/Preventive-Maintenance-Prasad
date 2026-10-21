@@ -104,7 +104,7 @@ function renderReportPage() {
     const eqLabel = EQ_LABELS[r.equipmentType]||r.equipmentType||'—';
     const periodeBadgeClass = {Daily:'b-daily',Weekly:'b-weekly',Monthly:'b-monthly',Quarterly:'b-quarterly','Semi-Annual':'b-quarterly',Annual:'b-yearly'}[r.periode]||'b-monthly';
     const aktTotal   = Array.isArray(r.aktivitas) ? r.aktivitas.length : 0;
-    const aktDone    = Array.isArray(r.aktivitas) ? r.aktivitas.filter(a=>a.yes||a.no_checked).length : 0;
+    const aktDone    = Array.isArray(r.aktivitas) ? r.aktivitas.filter(aktIsDone).length : 0;
     const anomaliCnt = Array.isArray(r.aktivitas) ? r.aktivitas.filter(a=>a.no_checked).length : 0;
     const spCount    = Array.isArray(r.spareParts) ? r.spareParts.filter(s=>s&&s.uraian).length : 0;
     const pct        = aktTotal ? Math.round(aktDone/aktTotal*100) : 0;
@@ -252,7 +252,7 @@ function renderResumePage() {
     if (!byType[k]) byType[k] = { label: EQ_LABELS[k]||k, count:0, aktTotal:0, aktDone:0, spCount:0 };
     byType[k].count++;
     byType[k].aktTotal += r.aktivitas?.length||0;
-    byType[k].aktDone  += r.aktivitas?.filter(a=>a.yes||a.no_checked).length||0;
+    byType[k].aktDone  += r.aktivitas?.filter(aktIsDone).length||0;
     byType[k].spCount  += r.spareParts?.filter(sp=>sp?.uraian).length||0;
   });
 
@@ -261,7 +261,7 @@ function renderResumePage() {
     const k = r.unit || '(Tanpa Unit)';
     if (!byUnit[k]) byUnit[k] = { count:0, done:0 };
     byUnit[k].count++;
-    const allDone = (r.aktivitas?.length||0) > 0 && r.aktivitas.every(a=>a.yes||a.no_checked);
+    const allDone = (r.aktivitas?.length||0) > 0 && r.aktivitas.every(aktIsDone);
     if (allDone) byUnit[k].done++;
   });
 
@@ -279,7 +279,7 @@ function renderResumePage() {
   const detailRows = filtered.map((r,i) => {
     const d = r.date ? new Date(r.date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}) : '—';
     const aktTotal = r.aktivitas?.length||0;
-    const aktDone  = r.aktivitas?.filter(a=>a.yes||a.no_checked).length||0;
+    const aktDone  = r.aktivitas?.filter(aktIsDone).length||0;
     const pct      = aktTotal ? Math.round(aktDone/aktTotal*100) : 0;
     const spCount  = r.spareParts?.filter(sp=>sp?.uraian).length||0;
     const ppeKeys  = {helm:'Helm',masker:'Masker',sarungTangan:'Sarung Tangan',earPlug:'Ear Plug',sepatu:'Sepatu',harness:'Harness',lain:'Lain'};

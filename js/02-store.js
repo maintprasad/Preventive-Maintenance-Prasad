@@ -158,3 +158,6 @@ function mergeById(localArr, remoteArr, pendingIds, deletedIds) {
 
   return Array.from(map.values());
 }
+
+// Item checklist dihitung "dilakukan" bila Yes/No dicentang, ATAU keterangan diisi walau tidak ada centang.
+function aktIsDone(a) { return !!(a && (a.yes || a.no_checked || String(a.keterangan || '').trim())); }

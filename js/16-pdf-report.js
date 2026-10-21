@@ -242,7 +242,7 @@ function printResume() {
     const k = r.equipmentType||'unknown';
     if (!byType[k]) byType[k]={label:EQ_LABELS[k]||k,count:0,aktTotal:0,aktDone:0,spCount:0};
     byType[k].count++; byType[k].aktTotal+=r.aktivitas?.length||0;
-    byType[k].aktDone+=r.aktivitas?.filter(a=>a.yes||a.no_checked).length||0;
+    byType[k].aktDone+=r.aktivitas?.filter(aktIsDone).length||0;
     byType[k].spCount+=r.spareParts?.filter(sp=>sp?.uraian).length||0;
   });
 
@@ -253,7 +253,7 @@ function printResume() {
 
   const detailRows = reports.map((r,i)=>{
     const d=r.date?new Date(r.date).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'}):'—';
-    const aktTotal=r.aktivitas?.length||0; const aktDone=r.aktivitas?.filter(a=>a.yes||a.no_checked).length||0;
+    const aktTotal=r.aktivitas?.length||0; const aktDone=r.aktivitas?.filter(aktIsDone).length||0;
     const p=aktTotal?Math.round(aktDone/aktTotal*100):0;
     const sp=r.spareParts?.filter(s=>s?.uraian).map(s=>`${s.uraian}${s.spesifikasi?' ('+s.spesifikasi+')':''} x${s.jumlah||1}`).join('; ')||'—';
     const ppeKeys={helm:'Helm',masker:'Masker',sarungTangan:'Sarung Tangan',earPlug:'Ear Plug',sepatu:'Sepatu',harness:'Harness',lain:'Lain'};
