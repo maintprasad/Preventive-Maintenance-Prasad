@@ -119,8 +119,8 @@ const PM_UNITS = ['Unit 1', 'Unit 2', 'Unit Malang'];
 const PM_UNIT_FORMATS = [
   { match: /malang/i, name: 'Unit Malang', roles: [
     { key: 'execute',  title: 'Teknisi PM',     sub: 'Execute by' },
-    { key: 'checked',  title: 'Supervisor MTC', sub: 'Checked by' },
-    { key: 'review',   title: 'Manager MTC',    sub: 'Review by' },
+    { key: 'checked',  title: 'Supervisor MTC', sub: 'Checked by', defaultName: 'Bambang / Khoirus' },
+    { key: 'review',   title: 'Manager MTC',    sub: 'Review by', defaultName: 'Tumade Fefarri' },
     { key: 'approved', title: 'Plan Manager',   sub: 'Approved by', defaultName: 'Marrio Dwi Oktavianto' }
   ] }
 ];
