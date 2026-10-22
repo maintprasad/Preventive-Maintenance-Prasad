@@ -12,7 +12,6 @@ function openScheduleModal(editId = null, preset = {}) {
     document.getElementById('schModalTitle').textContent = 'Edit Schedule PM';
     document.getElementById('sch-unit').value = s.unit||'';
     document.getElementById('sch-area').value = s.area||'';
-    document.getElementById('sch-equipment').value = s.equipment||'';
     document.getElementById('sch-tagno').value = s.tagNo||'';
     document.getElementById('sch-eq-type').value = s.equipmentType||'';
     document.getElementById('sch-periode').value = s.periode||'Monthly';
@@ -26,7 +25,7 @@ function openScheduleModal(editId = null, preset = {}) {
     document.getElementById('sch-notes').value = s.notes||'';
   } else {
     document.getElementById('schModalTitle').textContent = 'Tambah Schedule PM';
-    ['sch-unit','sch-area','sch-equipment','sch-tagno','sch-pic','sch-mp','sch-hari','sch-notes'].forEach(id=>document.getElementById(id).value='');
+    ['sch-unit','sch-area','sch-equipment-new','sch-tagno','sch-pic','sch-mp','sch-hari','sch-notes'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('sch-eq-type').value='';
     document.getElementById('sch-periode').value='Monthly';
     document.getElementById('sch-month').value=now.getMonth()+1;
@@ -37,13 +36,52 @@ function openScheduleModal(editId = null, preset = {}) {
     if (preset.area) document.getElementById('sch-area').value = preset.area;
   }
   refreshUnitAreaDatalists('sch-unit', 'sch-unit-list', 'sch-area-list');
+  schRefreshEquipment(editId ? (getData(STORE.SCHEDULES).find(x=>x.id===editId)||{}).equipment : '');
   openOverlay('scheduleOverlay');
+}
+
+// ── Nama Equipment = dropdown bertingkat (Unit → Area → Equipment) ──
+// Daftar diambil dari schedule yang sudah ada pada unit + area terpilih; "＋ Equipment baru…" membuka isian nama baru.
+const SCH_EQ_NEW = '__new__';
+function schEquipmentValue() {
+  const v = document.getElementById('sch-equipment').value;
+  return (v === SCH_EQ_NEW ? document.getElementById('sch-equipment-new').value : v).trim();
+}
+function schRefreshEquipment(keep) {
+  const sel = document.getElementById('sch-equipment'), nw = document.getElementById('sch-equipment-new');
+  if (!sel) return;
+  const unit = document.getElementById('sch-unit').value.trim(), area = document.getElementById('sch-area').value.trim();
+  const prev = keep !== undefined ? keep : (sel.value === SCH_EQ_NEW ? SCH_EQ_NEW : sel.value);
+  if (!unit || !area) {
+    sel.innerHTML = '<option value="">-- Pilih unit & area dulu --</option>'; sel.value = ''; nw.style.display = 'none'; return;
+  }
+  const names = [...new Set(getData(STORE.SCHEDULES).filter(s => s.unit === unit && s.area === area && s.equipment).map(s => s.equipment))]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+  sel.innerHTML = '<option value="">-- Pilih equipment (' + names.length + ') --</option>' +
+    names.map(n => '<option value="' + escapeHtml(n) + '">' + escapeHtml(n) + '</option>').join('') +
+    '<option value="' + SCH_EQ_NEW + '">＋ Equipment baru…</option>';
+  if (prev === SCH_EQ_NEW || names.includes(prev)) sel.value = prev;
+  else sel.value = names.length ? '' : SCH_EQ_NEW;   // belum ada equipment di unit+area ini → langsung mode equipment baru
+  nw.style.display = sel.value === SCH_EQ_NEW ? '' : 'none';
+}
+// Dipilih dari daftar → Tag No & tipe terisi otomatis dari schedule yang ada; "baru" → tampilkan isian nama
+function schEquipmentChanged() {
+  const sel = document.getElementById('sch-equipment'), nw = document.getElementById('sch-equipment-new');
+  nw.style.display = sel.value === SCH_EQ_NEW ? '' : 'none';
+  if (sel.value === SCH_EQ_NEW) { nw.focus(); return; }
+  if (!sel.value || document.getElementById('sch-edit-id').value) return;
+  const unit = document.getElementById('sch-unit').value.trim(), area = document.getElementById('sch-area').value.trim();
+  const ref = getData(STORE.SCHEDULES).filter(s => s.unit === unit && s.area === area && s.equipment === sel.value)
+    .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')))[0];
+  if (!ref) return;
+  if (!document.getElementById('sch-tagno').value.trim()) document.getElementById('sch-tagno').value = ref.tagNo || '';
+  if (!document.getElementById('sch-eq-type').value) document.getElementById('sch-eq-type').value = ref.equipmentType || '';
 }
 
 async function saveSchedule() {
   const unit = document.getElementById('sch-unit').value.trim();
   const area = document.getElementById('sch-area').value.trim();
-  const equipment = document.getElementById('sch-equipment').value.trim();
+  const equipment = schEquipmentValue();
   const periode = document.getElementById('sch-periode').value;
   const editId = document.getElementById('sch-edit-id').value;
 

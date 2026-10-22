@@ -550,9 +550,9 @@
   <div class="modal-body">
     <input type="hidden" id="sch-edit-id">
     <div class="form-grid">
-      <div class="fg"><span class="flabel">Unit *</span><input class="finput" type="text" id="sch-unit" list="sch-unit-list" autocomplete="off" placeholder="Pilih / ketik unit" oninput="refreshUnitAreaDatalists('sch-unit','sch-unit-list','sch-area-list')"><datalist id="sch-unit-list"></datalist></div>
-      <div class="fg"><span class="flabel">Area *</span><input class="finput" type="text" id="sch-area" list="sch-area-list" autocomplete="off" placeholder="Pilih / ketik area (sesuai unit)" onfocus="refreshUnitAreaDatalists('sch-unit','sch-unit-list','sch-area-list')"><datalist id="sch-area-list"></datalist></div>
-      <div class="fg"><span class="flabel">Nama Equipment *</span><input class="finput" type="text" id="sch-equipment" placeholder="Nama equipment"></div>
+      <div class="fg"><span class="flabel">Unit *</span><input class="finput" type="text" id="sch-unit" list="sch-unit-list" autocomplete="off" placeholder="Pilih / ketik unit" oninput="refreshUnitAreaDatalists('sch-unit','sch-unit-list','sch-area-list');schRefreshEquipment()" onchange="schRefreshEquipment()"><datalist id="sch-unit-list"></datalist></div>
+      <div class="fg"><span class="flabel">Area *</span><input class="finput" type="text" id="sch-area" list="sch-area-list" autocomplete="off" placeholder="Pilih / ketik area (sesuai unit)" onfocus="refreshUnitAreaDatalists('sch-unit','sch-unit-list','sch-area-list')" oninput="schRefreshEquipment()" onchange="schRefreshEquipment()"><datalist id="sch-area-list"></datalist></div>
+      <div class="fg"><span class="flabel">Nama Equipment *</span><select class="fsel2" id="sch-equipment" onchange="schEquipmentChanged()"><option value="">-- Pilih unit &amp; area dulu --</option></select><input class="finput" type="text" id="sch-equipment-new" placeholder="Ketik nama equipment baru" style="display:none;margin-top:6px"></div>
       <div class="fg"><span class="flabel">Tag No</span><input class="finput" type="text" id="sch-tagno" placeholder="TAG-001"></div>
       <div class="fg"><span class="flabel">Equipment Type</span><select class="fsel2" id="sch-eq-type">
         <option value="">-- Pilih --</option><option value="air_dryer">Air Dryer</option><option value="belt_conveyor">Belt Conveyor</option><option value="blower">Blower</option>
