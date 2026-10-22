@@ -251,5 +251,28 @@ const t = async (name, fn) => { try { await fn(); passed++; console.log('  ✓',
     assert.equal(got.spvName, 'Leader X'); assert.equal(JSON.parse(got.signers).approved.name, 'Marrio Dwi Oktavianto');
   });
 
+  // ── Tanda tangan tersimpan (pustaka per orang) ──
+  await t('sigprofiles: simpan, baca, perbarui; yang lebih lama tidak menimpa; hapus lunak muncul di daftar deleted', async () => {
+    const r = await call('saveSigProfile', { profile: { id: 'SP-1', name: 'Marrio Dwi Oktavianto', jabatan: 'Plan Manager', sig: PIXEL, updatedAt: '2026-10-10T01:00:00.000Z' } });
+    assert.equal(r.success, true);
+    let g = await call('getSigProfiles', { since: '' });
+    assert.equal(g.profiles.length, 1); assert.equal(g.profiles[0].name, 'Marrio Dwi Oktavianto'); assert.equal(g.profiles[0].sig, PIXEL); assert.equal(g.profiles[0].serverAt, undefined);
+    await call('saveSigProfile', { profile: { id: 'SP-1', name: 'Marrio D.O.', jabatan: 'Plan Manager', sig: PIXEL, updatedAt: '2026-10-11T01:00:00.000Z' } });
+    await call('saveSigProfile', { profile: { id: 'SP-1', name: 'LAMA', jabatan: '', sig: PIXEL, updatedAt: '2026-10-09T01:00:00.000Z' } });   // kiriman lama dari antrian offline
+    g = await call('getSigProfiles', { since: '' });
+    assert.equal(g.profiles[0].name, 'Marrio D.O.');
+    await call('saveSigProfile', { profile: { id: 'SP-1', name: 'Marrio D.O.', sig: '', deleted: true, updatedAt: '2026-10-12T01:00:00.000Z' } });
+    g = await call('getSigProfiles', { since: '' });
+    assert.equal(g.profiles.length, 0); assert.deepEqual(g.deleted, ['SP-1']);
+    await call('saveSigProfile', { profile: { id: 'SP-1', name: 'Hidup lagi?', sig: PIXEL, updatedAt: '2026-10-11T05:00:00.000Z' } });   // kiriman lama tidak menghidupkan lagi
+    assert.equal((await call('getSigProfiles', { since: '' })).profiles.length, 0);
+  });
+  await t('sigprofiles: tanpa nama / bukan PNG / tanpa gambar / id tidak valid ditolak (400)', async () => {
+    assert.equal((await call('saveSigProfile', { profile: { id: 'SP-2', name: '', sig: PIXEL } })).status, 400);
+    assert.equal((await call('saveSigProfile', { profile: { id: 'SP-2', name: 'A', sig: 'data:image/jpeg;base64,AAAA' } })).status, 400);
+    assert.equal((await call('saveSigProfile', { profile: { id: 'SP-2', name: 'A', sig: '' } })).status, 400);
+    assert.equal((await call('saveSigProfile', { profile: { id: 'bad id!', name: 'A', sig: PIXEL } })).status, 400);
+  });
+
   console.log(`\n${passed} tes lolos${process.exitCode ? ', ADA YANG GAGAL' : ''}`);
 })();

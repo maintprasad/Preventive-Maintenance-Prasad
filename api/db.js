@@ -122,6 +122,16 @@ const SCHEMA = [
     updatedBy       TEXT,
     serverAt        TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS sigprofiles (
+    id        TEXT PRIMARY KEY,
+    name      TEXT NOT NULL,
+    jabatan   TEXT NOT NULL DEFAULT '',
+    sig       TEXT NOT NULL DEFAULT '',
+    updatedAt TEXT NOT NULL,
+    deletedAt TEXT,
+    updatedBy TEXT,
+    serverAt  TEXT NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS templates (
     equipmentType TEXT PRIMARY KEY,
     items         TEXT NOT NULL DEFAULT '[]',
@@ -156,6 +166,7 @@ const SCHEMA = [
   `CREATE INDEX IF NOT EXISTS idx_reports_serverAt   ON reports(serverAt)`,
   `CREATE INDEX IF NOT EXISTS idx_reports_date       ON reports(date)`,
   `CREATE INDEX IF NOT EXISTS idx_signatures_serverAt ON signatures(serverAt)`,
+  `CREATE INDEX IF NOT EXISTS idx_sigprofiles_serverAt ON sigprofiles(serverAt)`,
   `CREATE INDEX IF NOT EXISTS idx_audit_at           ON audit_log(at)`
 ];
 
@@ -166,6 +177,7 @@ const REPORT_COLS = ['id','tagNo','date','equipmentType','equipmentName','unit',
   'teknisi','approval','notes','ppe','aktivitas','spareParts','pmNo','photos','submittedAt','updatedAt','deletedAt','updatedBy','serverAt'];
 const SIGNATURE_COLS = ['pmId','tagNo','equipmentName','tanggal','spvName','spvSignature','spvSignedAt',
   'leaderName','leaderSignature','leaderSignedAt','signers','updatedAt','updatedBy','serverAt'];
+const SIGPROFILE_COLS = ['id','name','jabatan','sig','updatedAt','deletedAt','updatedBy','serverAt'];
 const TEMPLATE_COLS = ['equipmentType','items','updatedAt','updatedBy','serverAt'];
 const MASTER_COLS = ['kind','data','updatedAt','updatedBy','serverAt'];
 const MASTER_KINDS = ['units', 'eqtypes'];
@@ -187,6 +199,7 @@ const SQL = {
   upsertSchedule:  upsertSql('schedules',  SCHEDULE_COLS,  'id',            { keep: ['createdAt'], softDelete: true, optional: ['plan'] }),
   upsertReport:    upsertSql('reports',    REPORT_COLS,    'id',            { softDelete: true, optional: ['pmNo', 'photos'] }),
   upsertSignature: upsertSql('signatures', SIGNATURE_COLS, 'pmId', { optional: ['signers'] }),
+  upsertSigProfile: upsertSql('sigprofiles', SIGPROFILE_COLS, 'id', { softDelete: true }),
   upsertTemplate:  upsertSql('templates',  TEMPLATE_COLS,  'equipmentType'),
   // Master data bersifat tambah-saja dan digabung (union) di server sebelum ditulis,
   // jadi urutan tulis dari beberapa perangkat tidak boleh menghapus entri.
@@ -430,6 +443,17 @@ function normReport(r, ctx) {
     deletedAt: null, updatedBy: ctx.deviceId, serverAt: ctx.now
   };
 }
+// Tanda tangan tersimpan (pustaka per orang, dipakai ulang di banyak laporan). deleted:true = hapus lunak.
+function normSigProfile(p, ctx) {
+  if (!p || typeof p !== 'object') throw bad('tanda tangan tersimpan kosong');
+  const name = text(p.name, 100);
+  if (!name) throw bad('nama wajib diisi');
+  const sig = png(p.sig);
+  const deleted = p.deleted === true;
+  if (!sig && !deleted) throw bad('gambar tanda tangan wajib diisi');
+  const updatedAt = stamp(p.updatedAt, ctx.now);
+  return { id: id(p.id, 'id'), name, jabatan: text(p.jabatan, 100), sig, updatedAt, deletedAt: deleted ? updatedAt : null, updatedBy: ctx.deviceId, serverAt: ctx.now };
+}
 function normSignature(s, ctx) {
   if (!s || typeof s !== 'object') throw bad('tanda tangan kosong');
   return {
@@ -599,6 +623,16 @@ const ACTIONS = {
     return { signatures: r.rows, cursor: ctx.now };
   },
 
+  async saveSigProfile(b, ctx) {
+    const p = normSigProfile(b.profile, ctx);
+    await runPipeline([{ sql: SQL.upsertSigProfile, args: argsOf(p, SIGPROFILE_COLS) }, audit(ctx, p.deletedAt ? 'deleteSigProfile' : 'saveSigProfile', p.id)]);
+    return {};
+  },
+  async getSigProfiles(b, ctx) {
+    const { rows, deleted, cursor } = await pullTable('sigprofiles', b.since, ctx);
+    return { profiles: rows, deleted, cursor };
+  },
+
   async getTemplates() {
     const r = await query('SELECT equipmentType, items FROM templates');
     const templates = {};
@@ -740,4 +774,4 @@ module.exports = async function handler(req, res) {
 };
 
 // Diekspor untuk pengujian lokal (tools/test-api.js)
-module.exports._internal = { SCHEMA, normSchedule, normReport, normSignature, normTemplate, normMasterData, planField, photosField, signersField, neutralize };
+module.exports._internal = { SCHEMA, normSigProfile, normSchedule, normReport, normSignature, normTemplate, normMasterData, planField, photosField, signersField, neutralize };

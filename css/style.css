@@ -728,3 +728,21 @@ label.btn-ghost.photo-btn{border:1px solid var(--border)}
   .page > .sec-hdr:first-child > div:last-child::-webkit-scrollbar{display:none}
   .page > .sec-hdr:first-child > div:last-child > *{flex:0 0 auto !important;min-width:0 !important;white-space:nowrap !important}
 }
+
+/* ── Tanda Tangan Tersimpan (Pengaturan) + pemilih di modal pengesahan ── */
+.sigp-list{display:flex;flex-direction:column;gap:8px}
+.sigp-item{display:flex;align-items:center;gap:12px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg3)}
+.sigp-img{width:140px;height:56px;flex-shrink:0;background:#fff;border:1px solid var(--border);border-radius:6px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sigp-img img{max-width:100%;max-height:100%;object-fit:contain}
+.sigp-info{flex:1;min-width:0}
+.sigp-name{font-weight:700;font-size:13px;overflow-wrap:anywhere}
+.sigp-role{font-size:11px;color:var(--text3);margin-top:2px;overflow-wrap:anywhere}
+.sigp-act{display:flex;gap:6px;flex-shrink:0}
+.sigp-tools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.sigp-pick{margin-bottom:10px}
+@media(max-width:768px){
+  .sigp-item{flex-wrap:wrap}
+  .sigp-img{width:100%;height:64px}
+  .sigp-act{width:100%}
+  .sigp-act .btn-ghost{flex:1}
+}

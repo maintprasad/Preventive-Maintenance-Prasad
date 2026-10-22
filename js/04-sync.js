@@ -84,11 +84,12 @@ async function syncFromSheets(auto = false) {
     await flushSyncQueue();
 
     const cur = auto ? _getCursors() : {};
-    const [schRes, repRes, sigRes, masterRes] = await Promise.allSettled([
+    const [schRes, repRes, sigRes, masterRes, sigpRes] = await Promise.allSettled([
       api('getSchedules',  { since: cur.schedules  || '' }, 2),
       api('getReports',    { since: cur.reports    || '' }, 2),
       api('getSignatures', { since: cur.signatures || '' }, 1),
-      pullMasterFromServer()   // master data (unit/area/tipe equipment) — kecil, tarik penuh tiap sync
+      pullMasterFromServer(),  // master data (unit/area/tipe equipment) — kecil, tarik penuh tiap sync
+      api('getSigProfiles', { since: cur.sigprofiles || '' }, 1)   // tanda tangan tersimpan (Pengaturan)
     ]);
     if (masterRes.status === 'rejected') console.warn('[PM] sync master gagal:', masterRes.reason);
     const schOK = schRes.status === 'fulfilled' && schRes.value?.success && Array.isArray(schRes.value.schedules);
@@ -113,6 +114,11 @@ async function syncFromSheets(auto = false) {
     if (sigRes.status === 'fulfilled' && sigRes.value?.success && Array.isArray(sigRes.value.signatures)) {
       mergeRemoteSignatures(sigRes.value.signatures);
       _setCursor('signatures', sigRes.value.cursor);
+    }
+
+    if (sigpRes.status === 'fulfilled' && sigpRes.value?.success && Array.isArray(sigpRes.value.profiles)) {
+      mergeRemoteSigProfiles(sigpRes.value.profiles, sigpRes.value.deleted);
+      _setCursor('sigprofiles', sigpRes.value.cursor);
     }
 
     _invalidateCache();

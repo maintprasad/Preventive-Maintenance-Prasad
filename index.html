@@ -460,6 +460,13 @@
       <div id="mst-types"></div>
     </div>
 
+    <div class="section-card settings-wide" id="sigp-card">
+      <div class="section-card-title">6. Tanda Tangan Tersimpan</div>
+      <div class="settings-hint" style="margin-bottom:10px">Buat tanda tangan tiap orang sekali saja; di pengesahan laporan tinggal pilih namanya. Tersinkron ke semua perangkat. Laporan yang sudah disahkan tidak berubah bila entri di sini diubah atau dihapus.</div>
+      <div id="sigp-list" class="sigp-list"></div>
+      <button class="btn-primary" style="margin-top:10px" onclick="openSigProfileModal()">+ Tambah Tanda Tangan</button>
+    </div>
+
     <div class="section-card settings-wide" id="pwa-card">
       <div class="section-card-title">Aplikasi (PWA)</div>
       <div class="pwa-info">
@@ -630,6 +637,28 @@
   </div>
 </div></div>
 
+<!-- MODAL: TANDA TANGAN TERSIMPAN (Pengaturan) -->
+<div class="overlay" id="sigProfileOverlay"><div class="modal modal-lg">
+  <div class="modal-hdr"><span class="modal-title" id="sigp-modal-title">Tambah Tanda Tangan Tersimpan</span><button class="modal-close" onclick="closeOverlay('sigProfileOverlay')">×</button></div>
+  <div class="modal-body">
+    <div class="form-grid" style="margin-bottom:10px">
+      <div class="fg"><span class="flabel">Nama *</span><input class="finput" type="text" id="sig-prof-name" maxlength="100" placeholder="Nama lengkap"></div>
+      <div class="fg"><span class="flabel">Jabatan</span><input class="finput" type="text" id="sigp-jabatan" maxlength="100" placeholder="mis. Plan Manager"></div>
+    </div>
+    <div class="sigp-tools">
+      <button class="btn-primary" style="font-size:10px" onclick="generateArtisticSignature('prof')">✒️ Generate Otomatis</button>
+      <label class="btn-ghost" style="font-size:10px;cursor:pointer">🖼 Unggah Gambar<input type="file" id="sigp-file" accept="image/*" style="display:none" onchange="sigProfileLoadFile(this)"></label>
+      <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('prof')">🗑 Kosongkan</button>
+    </div>
+    <div style="border:2px dashed var(--border);border-radius:8px;overflow:hidden;background:#fff;position:relative">
+      <canvas id="sig-canvas-prof" width="720" height="140" style="width:100%;height:140px;display:block;cursor:crosshair;touch-action:none"></canvas>
+      <div id="sig-prof-hint" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;font-size:12px;color:var(--border);font-family:'IBM Plex Mono',monospace">Tanda tangan di sini</div>
+    </div>
+    <div id="sig-prof-saved" style="display:none;margin-top:6px;font-size:11px;color:var(--green2);font-family:'IBM Plex Mono',monospace">✓ Tanda tangan tersimpan</div>
+    <div class="form-actions"><button class="btn-ghost" onclick="closeOverlay('sigProfileOverlay')">Batal</button><button class="btn-primary" onclick="saveSigProfile()">💾 Simpan</button></div>
+  </div>
+</div></div>
+
 <!-- MODAL: BUAT WO DARI LAPORAN PM -->
 <div class="overlay" id="woFromPMOverlay"><div class="modal modal-lg">
   <div class="modal-hdr"><span class="modal-title">⚠ Buat Work Order dari Laporan PM</span><button class="modal-close" onclick="closeOverlay('woFromPMOverlay')">×</button></div>
@@ -747,6 +776,7 @@
 <script src="js/24-yearend.js"></script>
 <script src="js/25-pmno.js"></script>
 <script src="js/26-photos.js"></script>
+<script src="js/27-sigprofiles.js"></script>
 <script src="js/22-pwa.js"></script>
 <script src="js/20-main.js"></script>
 </body>

@@ -17,11 +17,13 @@ function _sigBlockHTML(r) {
   const k = r.key;
   return `<div class="section-card" style="margin-bottom:12px">
       <div class="section-card-title">${escapeHtml(r.title)}</div>
+      <div class="sigp-pick"><select class="fsel2" id="sig-${k}-pick" onchange="sigApplyProfile('${k}')" aria-label="Pilih tanda tangan tersimpan">${sigProfileOptionsHTML()}</select></div>
       <div class="form-grid" style="margin-bottom:10px">
         <div class="fg"><span class="flabel">${escapeHtml(r.label)}</span><input class="finput" type="text" id="sig-${k}-name" placeholder="Nama lengkap"></div>
         <div class="fg" style="justify-content:flex-end;padding-top:18px;flex-direction:row;gap:6px">
           <button class="btn-primary" style="font-size:10px;flex:1" onclick="generateArtisticSignature('${k}')">✒️ Generate Otomatis</button>
           <button class="btn-ghost" style="font-size:10px" onclick="clearSigCanvas('${k}')">🗑 Hapus TTD</button>
+          <button class="btn-ghost" style="font-size:10px" onclick="sigSaveRoleAsProfile('${k}', '${escapeHtml(r.title.replace(/ \(.*$/, ''))}')" title="Simpan nama & tanda tangan ini ke daftar tersimpan (Pengaturan)">💾 Simpan ke Daftar</button>
         </div>
       </div>
       <div style="border:2px dashed var(--border);border-radius:8px;overflow:hidden;background:#fff;position:relative">

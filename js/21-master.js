@@ -128,6 +128,7 @@ function onMasterEqUnitChange() {
 }
 
 function renderSettingsPage() {
+  if (typeof renderSigProfiles === 'function') renderSigProfiles();
   const units = getAllUnits();
   _fillSelect('mst-area-unit', units, '-- Pilih Unit --', document.getElementById('mst-area-unit')?.value);
   _fillSelect('mst-eq-unit', units, '-- Pilih Unit --', document.getElementById('mst-eq-unit')?.value);
