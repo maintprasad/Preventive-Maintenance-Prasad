@@ -710,3 +710,21 @@ label.btn-ghost.photo-btn{border:1px solid var(--border)}
     overscroll-behavior:contain}
   .layout>.content, .layout>main{min-width:0;flex:1}
 }
+
+/* ── Header tiap halaman (judul + tombol aksi) tetap di atas saat halaman di-scroll ──
+   .content/.layout/.page memakai overflow-x:clip (bukan hidden) supaya tidak menjadi scroll container yang mematikan sticky. */
+.content, .layout, .page{overflow-x:clip;overflow-y:visible}
+.page > .sec-hdr:first-child{
+  position:sticky;top:calc(56px + env(safe-area-inset-top));z-index:90;
+  background:var(--bg);padding:10px 0;margin-top:-10px;margin-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+@media(max-width:768px){
+  .page > .sec-hdr:first-child{padding:8px 0;margin-top:-8px;margin-bottom:10px}
+}
+@media(max-width:768px){
+  /* Tombol aksi di header menempel: satu baris, bisa digeser ke samping supaya header tidak memakan layar */
+  .page > .sec-hdr:first-child > div:last-child{flex-wrap:nowrap !important;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .page > .sec-hdr:first-child > div:last-child::-webkit-scrollbar{display:none}
+  .page > .sec-hdr:first-child > div:last-child > *{flex:0 0 auto !important;min-width:0 !important;white-space:nowrap !important}
+}
