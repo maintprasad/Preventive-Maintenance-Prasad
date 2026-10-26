@@ -17,13 +17,13 @@
    NAIKKAN VERSION setiap rilis yang mengubah daftar berkas di SHELL_FILES.
    ════════════════════════════════════════════════════════ */
 'use strict';
-const VERSION = 'pm-3.3.0';
+const VERSION = 'pm-3.4.0';
 const SHELL_CACHE = VERSION + '-shell';
 const CDN_CACHE = 'pm-cdn-v1';              // CDN versinya sudah dikunci di URL → tidak ikut VERSION
 const NETWORK_TIMEOUT_MS = 5000;
 
 const SHELL_FILES = [
-  './', 'index.html', 'manifest.webmanifest', 'css/style.css',
+  './', 'index.html', 'manifest.webmanifest', 'css/style.css', 'css/theme-boron.css', 'assets/fonts/lexend-latin.woff2', 'assets/fonts/lexend-latin-ext.woff2',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png', 'icons/favicon-32.png',
   'js/00-config.js', 'js/01-utils.js', 'js/02-store.js', 'js/03-api.js', 'js/04-sync.js', 'js/05-lock.js',
   'js/06-nav.js', 'js/07-dashboard.js', 'js/08-inputpm.js', 'js/09-schedule.js', 'js/10-calendar.js',

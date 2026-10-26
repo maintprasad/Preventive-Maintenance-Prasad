@@ -6,7 +6,7 @@
 <title>Prasad Seeds — Preventive Maintenance</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.webmanifest"/>
-<meta name="theme-color" content="#1a3a6b"/>
+<meta name="theme-color" content="#fffbf4"/>
 <meta name="application-name" content="PM Prasad"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
@@ -15,10 +15,11 @@
 <meta name="format-detection" content="telephone=no"/>
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png"/>
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png"/>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Sacramento&family=Alex+Brush&family=Pacifico&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&family=Great+Vibes&family=Sacramento&family=Alex+Brush&family=Pacifico&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <link rel="stylesheet" href="css/style.css"/>
+<link rel="stylesheet" href="css/theme-boron.css"/>
 </head>
 <body>
 
@@ -43,24 +44,24 @@
 <aside class="sidebar" id="sidebar">
   <div class="sb-section">
     <div class="sb-label">Overview</div>
-    <button class="sb-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="sb-icon">◈</span>Dashboard PM</button>
-    <button class="sb-item" data-page="schedule" onclick="showPage('schedule')"><span class="sb-icon">📅</span>Schedule PM</button>
+    <button class="sb-item active" data-page="dashboard" onclick="showPage('dashboard')"><span class="sb-icon ico ico-dashboard" aria-hidden="true"></span>Dashboard PM</button>
+    <button class="sb-item" data-page="schedule" onclick="showPage('schedule')"><span class="sb-icon ico ico-calendar" aria-hidden="true"></span>Schedule PM</button>
   </div>
   <div class="sb-section">
     <div class="sb-label">Laporan</div>
-    <button class="sb-item" data-page="input-pm" onclick="showPage('input-pm');renderInputPMPage()"><span class="sb-icon">📋</span>Input PM</button>
-    <button class="sb-item" data-page="list" onclick="showPage('list')"><span class="sb-icon">▤</span>Daftar Laporan</button>
-    <button class="sb-item" data-page="resume" onclick="showPage('resume');renderResumePage()"><span class="sb-icon">📊</span>Resume Laporan</button>
+    <button class="sb-item" data-page="input-pm" onclick="showPage('input-pm');renderInputPMPage()"><span class="sb-icon ico ico-clipboard" aria-hidden="true"></span>Input PM</button>
+    <button class="sb-item" data-page="list" onclick="showPage('list')"><span class="sb-icon ico ico-file" aria-hidden="true"></span>Daftar Laporan</button>
+    <button class="sb-item" data-page="resume" onclick="showPage('resume');renderResumePage()"><span class="sb-icon ico ico-chart" aria-hidden="true"></span>Resume Laporan</button>
   </div>
   <div class="sb-section">
     <div class="sb-label">Tindak Lanjut</div>
-    <button class="sb-item" data-page="outstanding" onclick="showPage('outstanding');renderOutstandingPage()"><span class="sb-icon">⚡</span>Outstanding PM<span id="sb-outstanding-badge" style="margin-left:auto;background:rgba(192,57,43,.18);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;display:none">0</span></button>
-    <button class="sb-item" data-page="takeover" onclick="showPage('takeover');renderTakeoverPage()"><span class="sb-icon">🔄</span>Takeover PM<span id="sb-takeover-badge" style="margin-left:auto;background:rgba(230,126,34,.18);color:var(--orange);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;display:none">0</span></button>
+    <button class="sb-item" data-page="outstanding" onclick="showPage('outstanding');renderOutstandingPage()"><span class="sb-icon ico ico-bolt" aria-hidden="true"></span>Outstanding PM<span id="sb-outstanding-badge" style="margin-left:auto;background:rgba(192,57,43,.18);color:var(--red);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;display:none">0</span></button>
+    <button class="sb-item" data-page="takeover" onclick="showPage('takeover');renderTakeoverPage()"><span class="sb-icon ico ico-refresh" aria-hidden="true"></span>Takeover PM<span id="sb-takeover-badge" style="margin-left:auto;background:rgba(230,126,34,.18);color:var(--orange);font-family:'IBM Plex Mono',monospace;font-size:9px;padding:2px 7px;border-radius:10px;font-weight:700;display:none">0</span></button>
   </div>
   <div class="sb-section">
     <div class="sb-label">Pengaturan</div>
-    <button class="sb-item" data-page="settings" onclick="showPage('settings')"><span class="sb-icon">⚙</span>Unit, Area &amp; Equipment</button>
-    <button class="sb-item" data-page="templates" onclick="showPage('templates');loadTemplatePage()"><span class="sb-icon">🛠</span>Checklist (Template PM)</button>
+    <button class="sb-item" data-page="settings" onclick="showPage('settings')"><span class="sb-icon ico ico-settings" aria-hidden="true"></span>Unit, Area &amp; Equipment</button>
+    <button class="sb-item" data-page="templates" onclick="showPage('templates');loadTemplatePage()"><span class="sb-icon ico ico-checklist" aria-hidden="true"></span>Checklist (Template PM)</button>
   </div>
 </aside>
 
@@ -490,23 +491,23 @@
 
 <!-- MOBILE NAV -->
 <nav class="mobile-nav"><div class="mobile-nav-inner">
-  <button class="mnav-btn active" id="mnav-dashboard" onclick="showPage('dashboard')"><div class="mnav-ico-wrap"><span class="mnav-ico">◈</span></div><span>Dashboard</span></button>
-  <button class="mnav-btn" id="mnav-input-pm" onclick="showPage('input-pm');renderInputPMPage()"><div class="mnav-ico-wrap"><span class="mnav-ico">📋</span></div><span>Input PM</span></button>
-  <button class="mnav-btn" id="mnav-outstanding" onclick="showPage('outstanding');renderOutstandingPage()"><div class="mnav-ico-wrap"><span class="mnav-ico">⚡</span></div><span>Outstanding</span></button>
-  <button class="mnav-btn" id="mnav-schedule" onclick="showPage('schedule')"><div class="mnav-ico-wrap"><span class="mnav-ico">📅</span></div><span>Schedule</span></button>
-  <button class="mnav-btn" id="mnav-more" onclick="toggleMoreSheet()"><div class="mnav-ico-wrap"><span class="mnav-ico">⋯</span></div><span>More</span></button>
+  <button class="mnav-btn active" id="mnav-dashboard" onclick="showPage('dashboard')"><div class="mnav-ico-wrap"><span class="mnav-ico ico ico-dashboard" aria-hidden="true"></span></div><span>Dashboard</span></button>
+  <button class="mnav-btn" id="mnav-input-pm" onclick="showPage('input-pm');renderInputPMPage()"><div class="mnav-ico-wrap"><span class="mnav-ico ico ico-clipboard" aria-hidden="true"></span></div><span>Input PM</span></button>
+  <button class="mnav-btn" id="mnav-outstanding" onclick="showPage('outstanding');renderOutstandingPage()"><div class="mnav-ico-wrap"><span class="mnav-ico ico ico-bolt" aria-hidden="true"></span></div><span>Outstanding</span></button>
+  <button class="mnav-btn" id="mnav-schedule" onclick="showPage('schedule')"><div class="mnav-ico-wrap"><span class="mnav-ico ico ico-calendar" aria-hidden="true"></span></div><span>Schedule</span></button>
+  <button class="mnav-btn" id="mnav-more" onclick="toggleMoreSheet()"><div class="mnav-ico-wrap"><span class="mnav-ico ico ico-more" aria-hidden="true"></span></div><span>More</span></button>
 </div></nav>
 
 <div class="sidebar-backdrop" id="moreSheetBackdrop" onclick="closeMoreSheet()"></div>
 <div id="moreSheet" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:401;background:var(--bg2);border-top:2px solid var(--border);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(26,58,107,.15);padding:8px 0 max(8px,env(safe-area-inset-bottom))">
   <div style="width:36px;height:4px;background:var(--border);border-radius:2px;margin:6px auto 10px"></div>
   <div style="padding:0 16px 6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.08em;text-transform:uppercase">Menu Lainnya</div>
-  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('list')"><span class="sb-icon">▤</span>Daftar Laporan</button>
-  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('resume');renderResumePage()"><span class="sb-icon">📊</span>Resume Laporan</button>
-  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('schedule-calendar');renderCalendar()"><span class="sb-icon">📆</span>Calendar View</button>
-  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('takeover');renderTakeoverPage()"><span class="sb-icon">🔄</span>Takeover PM</button>
-  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('templates');loadTemplatePage()"><span class="sb-icon">🛠</span>Checklist (Template PM)</button>
-  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('settings')"><span class="sb-icon">⚙</span>Pengaturan (Unit, Area &amp; Equipment)</button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('list')"><span class="sb-icon ico ico-file" aria-hidden="true"></span>Daftar Laporan</button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('resume');renderResumePage()"><span class="sb-icon ico ico-chart" aria-hidden="true"></span>Resume Laporan</button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('schedule-calendar');renderCalendar()"><span class="sb-icon ico ico-calendar" aria-hidden="true"></span>Calendar View</button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('takeover');renderTakeoverPage()"><span class="sb-icon ico ico-refresh" aria-hidden="true"></span>Takeover PM</button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('templates');loadTemplatePage()"><span class="sb-icon ico ico-checklist" aria-hidden="true"></span>Checklist (Template PM)</button>
+  <button class="sb-item" style="width:calc(100% - 16px);margin:0 8px 2px" onclick="closeMoreSheet();showPage('settings')"><span class="sb-icon ico ico-settings" aria-hidden="true"></span>Pengaturan (Unit, Area &amp; Equipment)</button>
 </div>
 
 <div id="toast-container"></div>

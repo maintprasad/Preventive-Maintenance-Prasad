@@ -1,0 +1,189 @@
+/* ════════════════════════════════════════════════════════
+   TEMA "BORON" (neubrutalism) — lapisan tampilan di atas style.css
+   Hanya mengubah warna, font, border, bayangan, dan bentuk komponen.
+   Tidak menyentuh struktur halaman, alur kerja, maupun logika aplikasi.
+   Dimuat SETELAH style.css (lihat index.html); hapus <link> ini untuk kembali ke tampilan lama.
+   Referensi desain: folder Template/ (Boron Admin Dashboard).
+   ════════════════════════════════════════════════════════ */
+
+/* ── Font: Lexend (di-host sendiri → ikut offline/PWA). Nama 'IBM Plex Sans/Mono' dialiaskan ke Lexend
+      supaya SEMUA font-family lama (termasuk inline style di JS) otomatis tampil dengan font tema baru. ── */
+@font-face{font-family:'Lexend';font-style:normal;font-weight:100 900;font-display:swap;src:url(../assets/fonts/lexend-latin-ext.woff2) format('woff2');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Lexend';font-style:normal;font-weight:100 900;font-display:swap;src:url(../assets/fonts/lexend-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:100 900;font-display:swap;src:url(../assets/fonts/lexend-latin-ext.woff2) format('woff2');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'IBM Plex Sans';font-style:normal;font-weight:100 900;font-display:swap;src:url(../assets/fonts/lexend-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:100 900;font-display:swap;src:url(../assets/fonts/lexend-latin-ext.woff2) format('woff2');
+  unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C4,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'IBM Plex Mono';font-style:normal;font-weight:100 900;font-display:swap;src:url(../assets/fonts/lexend-latin.woff2) format('woff2');
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+/* ── Token warna & bentuk ── */
+:root{
+  --bg:#fffbf4;--bg2:#ffffff;--bg3:#f8f2e8;--border:#ded6c6;--line:#343a40;
+  --navy:#313a46;--green:#70bb63;--green2:#4f8f44;--green-light:#edf5e9;
+  --accent:#669776;--red:#d9534f;--blue:#3b8fd0;--teal:#669776;
+  --orange:#e8912d;--purple:#6b5eae;
+  --text:#2f3640;--text2:#4c4c5c;--text3:#737a8a;
+  --r:6px;--hard:4px 6px 0 #6c757d;--hard-sm:3px 3px 0 #6c757d;--shadow:4px 6px 0 #6c757d;
+}
+body{font-family:'Lexend',sans-serif;font-size:14px;color:var(--text);background:var(--bg)}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:#aeb4bd;border-radius:3px}
+
+/* ── Topbar: krem + garis putus-putus (seperti Boron) ── */
+.topbar{background:var(--bg);border-bottom:1px dashed var(--line)}
+.brand-logo{color:var(--navy);font-weight:700;letter-spacing:.02em}
+.brand-logo span{color:var(--accent)}
+.brand-dot{background:var(--green)}
+.top-right .btn-ghost{color:var(--navy) !important;border-color:var(--line) !important}
+.ham-btn{background:var(--accent);border:1px solid var(--line);border-radius:6px;box-shadow:#fff 2px 2px 0 0,var(--line) 2px 2px 0 1px}
+.ham-btn span{background:#fff}
+.sync-badge{font-family:'Lexend',sans-serif;font-weight:600;border-radius:6px}
+.sync-online{background:#e9f6e5;color:#2f6a27;border:1px solid #70bb63}
+.sync-syncing{background:#e6f1fa;color:#2b6ea6;border:1px solid #60addf}
+.sync-offline{background:#eef0f3;color:#5a6270;border:1px solid #a1a9b1}
+.sync-error{background:#fcf3df;color:#8a5a00;border:1px solid #ebb751}
+
+/* ── Sidebar hitam, item aktif krem dengan bayangan keras ── */
+.sidebar{background:#000;border-right:1px solid #000}
+.sb-label{color:#8d97a6;font-weight:600;letter-spacing:.12em}
+.sidebar .sb-item{color:#c4ccd8;border-radius:6px;border-left:3px solid transparent;padding:9px 10px}
+.sidebar .sb-item:hover{background:#1b1e25;color:#fff}
+.sidebar .sb-item.active{background:var(--bg);color:#000;font-weight:600;border-left:3px solid transparent;box-shadow:3px 4px 0 var(--bg)}
+.sidebar .sb-item.active:hover{background:var(--bg);color:#000}
+#moreSheet .sb-item{border-radius:6px;padding:9px 10px}
+
+/* ── Judul halaman ── */
+.sec-title{font-size:18px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.02em}
+.sec-sub{color:var(--text3);font-size:12px}
+.page > .sec-hdr:first-child{border-bottom:1px dashed var(--line)}
+
+/* ── Kartu: border gelap tipis + bayangan keras ── */
+.section-card,.stat-card,.chart-card,.tbl-wrap,.report-item,.gantt-wrap,.gantt-legend,.plancal,.pwa-bar,.week-target-card{
+  border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--hard)}
+.week-target-card,.pwa-bar{border-color:var(--line)}
+.report-item:hover,.stat-card:hover{box-shadow:var(--hard);border-color:var(--line)}
+.stat-card:hover{transform:translate(-1px,-1px)}
+.stat-card::before{width:5px}
+.section-card-title{font-family:'Lexend',sans-serif;font-size:11px;font-weight:700;color:var(--navy);letter-spacing:.08em;border-bottom:1px dashed var(--line)}
+.stat-lbl,.chart-lbl{font-family:'Lexend',sans-serif;font-weight:600;color:var(--text2);letter-spacing:.06em}
+.stat-val{font-weight:700}
+.ri-actions,.form-actions,.pagination,.plancal-summary{border-top-style:dashed;border-top-color:var(--line)}
+
+/* ── Tombol: isi penuh + garis ganda bergeser (ciri Boron) ── */
+.btn-primary,.btn-orange,.btn-ghost,.btn-red,.btn-blue,.tbl-btn,.pnav{
+  font-family:'Lexend',sans-serif;font-weight:500;letter-spacing:.01em;border-radius:5px;
+  transition:transform .08s ease,box-shadow .08s ease,background-color .12s}
+.btn-primary{background:var(--navy);color:#fff;border:1px solid var(--navy);box-shadow:#fff 3px 3px 0 0,var(--navy) 3px 3px 0 1px}
+.btn-primary:hover{background:#262d37;box-shadow:#fff 3px 3px 0 0,var(--navy) 3px 3px 0 1px}
+.btn-orange{background:var(--orange);color:#fff;border:1px solid var(--orange);box-shadow:#fff 3px 3px 0 0,var(--orange) 3px 3px 0 1px}
+.btn-orange:hover{background:#d37f1f}
+.btn-ghost{background:#fff;color:var(--navy);border:1px solid var(--line);box-shadow:#fff 3px 3px 0 0,var(--line) 3px 3px 0 1px}
+.btn-ghost:hover{background:var(--bg3);border-color:var(--line);color:var(--navy)}
+.btn-red{background:#fff;color:var(--red);border:1px solid var(--red);box-shadow:#fff 3px 3px 0 0,var(--red) 3px 3px 0 1px}
+.btn-red:hover{background:#fdeeee}
+.btn-blue{background:#fff;color:var(--blue);border:1px solid var(--blue);box-shadow:#fff 3px 3px 0 0,var(--blue) 3px 3px 0 1px}
+.btn-blue:hover{background:#eaf3fb}
+.tbl-btn{background:#fff;color:var(--navy);border:1px solid var(--line);box-shadow:#fff 2px 2px 0 0,var(--line) 2px 2px 0 1px}
+.tbl-btn:hover{background:var(--green-light);border-color:var(--line);color:var(--navy)}
+.tbl-btn.del{color:var(--red);border-color:var(--red);box-shadow:#fff 2px 2px 0 0,var(--red) 2px 2px 0 1px}
+.tbl-btn.del:hover{background:#fdeeee;border-color:var(--red);color:var(--red)}
+.tbl-btn.pdf{color:var(--blue);border-color:var(--blue);box-shadow:#fff 2px 2px 0 0,var(--blue) 2px 2px 0 1px}
+.tbl-btn.pdf:hover{background:#eaf3fb;border-color:var(--blue);color:var(--blue)}
+.pnav{background:#fff;color:var(--navy);border:1px solid var(--line)}
+.pnav:hover:not(:disabled){background:var(--green-light);border-color:var(--line);color:var(--navy)}
+.btn-primary:active,.btn-orange:active,.btn-ghost:active,.btn-red:active,.btn-blue:active,.tbl-btn:active{transform:translate(2px,2px);box-shadow:none}
+.btn-primary:disabled,.btn-ghost:disabled,.tbl-btn:disabled{box-shadow:none}
+
+/* ── Form ── */
+.flabel{font-family:'Lexend',sans-serif;font-weight:600;color:var(--text2);letter-spacing:.05em}
+.finput,.fsel2,.ftextarea,.fsel,.search-wrap,.sp-input,.aktivitas-ket{background:#fff;border:1px solid var(--line);border-radius:5px;color:var(--text);font-family:'Lexend',sans-serif}
+.finput:focus,.fsel2:focus,.ftextarea:focus,.fsel:focus,.fsel:hover,.search-wrap:focus-within,.sp-input:focus,.aktivitas-ket:focus{
+  border-color:var(--line);box-shadow:3px 3px 0 var(--accent)}
+.finput.err,.fsel2.err{border-color:var(--red);box-shadow:3px 3px 0 rgba(217,83,79,.35)}
+.ppe-item{background:#fff;border:1px solid var(--line);border-radius:5px}
+.ppe-item:hover{border-color:var(--line);box-shadow:var(--hard-sm)}
+.ppe-item input[type=checkbox],input[type=checkbox],input[type=radio]{accent-color:var(--navy)}
+
+/* ── Tabel ── */
+.data-table thead th,.gantt-table thead th{font-family:'Lexend',sans-serif;font-weight:600;letter-spacing:.06em;background:var(--navy);border-bottom:2px solid var(--line)}
+.data-table tbody tr:hover,.aktivitas-table tbody tr:hover{background:var(--green-light)}
+.data-table tbody tr,.aktivitas-table tbody tr{border-bottom-color:var(--border)}
+.aktivitas-table thead th{font-family:'Lexend',sans-serif;font-weight:600;background:var(--bg3);color:var(--text2)}
+.gantt-table thead th.gantt-eq-hdr{background:var(--navy)}
+.gantt-table tbody td{border-color:var(--border)}
+.gantt-pill{border-radius:6px;border:1px solid var(--line)}
+.gantt-pill.done{background:#70bb63;color:#1f3a1a}
+.gantt-pill.overdue{background:#ed6060;color:#fff}
+.gantt-pill.upcoming{background:#ebb751;color:#3a2a00}
+.gantt-popup{border:1px solid var(--line);box-shadow:6px 8px 0 #6c757d;border-radius:var(--r)}
+
+/* ── Badge ── */
+.badge{font-family:'Lexend',sans-serif;font-weight:600;border-radius:4px;letter-spacing:.02em}
+
+/* ── Modal ── */
+.overlay{background:rgba(49,58,70,.55);backdrop-filter:none}
+.modal{border:1px solid var(--line);border-radius:var(--r);box-shadow:6px 8px 0 #6c757d}
+.modal-hdr{padding:16px 24px 14px;border-bottom:1px dashed var(--line)}
+.modal-title{font-weight:700;color:var(--navy)}
+.modal-close{color:var(--navy);border:1px solid var(--line);background:#fff;border-radius:5px;width:30px;height:30px;font-size:18px;padding:0;display:flex;align-items:center;justify-content:center;box-shadow:#fff 2px 2px 0 0,var(--line) 2px 2px 0 1px}
+.modal-close:hover{background:var(--bg3);color:var(--navy)}
+.modal-body{padding:18px 24px 22px}
+
+/* ── Toast ── */
+.toast{border:1px solid var(--line);border-radius:6px;box-shadow:3px 4px 0 #6c757d;background:#fff;font-family:'Lexend',sans-serif}
+.toast-success{background:#eaf6e6;border-color:var(--line)}
+.toast-error{background:#fdeeee;border-color:var(--line)}
+.toast-warning{background:#fcf3df;border-color:var(--line)}
+.toast-info{background:#e8f3fb;border-color:var(--line)}
+
+/* ── Kalender rencana ── */
+.plancal-btn{border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--navy);box-shadow:#fff 2px 2px 0 0,var(--line) 2px 2px 0 1px}
+.plancal-btn:hover{background:var(--green-light);border-color:var(--line)}
+.plancal-day{border:1px solid var(--border);border-radius:6px;background:#fff}
+.plancal-day:hover:not(.blank){border-color:var(--line)}
+.plancal-day.sel{background:var(--navy);border-color:var(--line);color:#fff}
+.plancal-day.today{box-shadow:0 0 0 2px var(--accent) inset}
+.plancal-n{background:var(--accent)}
+.plancal-day.sel .plancal-n{background:#fff;color:var(--navy)}
+.plancal-chip{border:1px solid var(--line);background:#fff;color:var(--navy)}
+.plancal-dow span,.plancal-sumtitle,.plancal-chipn{font-family:'Lexend',sans-serif}
+.plancal-legend .lg.sel{background:var(--navy);border-color:var(--line)}
+.plancal-legend .lg.num{background:var(--accent);border-color:var(--accent)}
+
+/* ── Navigasi bawah (HP) ── */
+.mobile-nav{background:var(--bg);border-top:1px solid var(--line)}
+.mnav-btn{font-family:'Lexend',sans-serif}
+.mnav-btn.active{color:var(--navy)}
+
+/* ── Tanda tangan tersimpan ── */
+.sigp-item{border:1px solid var(--line);border-radius:6px;background:#fff;box-shadow:var(--hard-sm)}
+.sigp-img{border:1px solid var(--line)}
+
+/* ── Ikon garis (gaya Tabler) untuk menu: topeng SVG berwarna currentColor, tanpa font ikon ── */
+.ico{display:inline-block;width:18px;height:18px;background:currentColor;-webkit-mask:var(--ico) center/contain no-repeat;mask:var(--ico) center/contain no-repeat;vertical-align:middle;flex-shrink:0}
+.sb-icon.ico{width:18px;height:18px;font-size:0}
+.mnav-ico.ico{width:22px;height:22px;font-size:0}
+.ico-dashboard{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%204h6v8h-6z%20M4%2016h6v4h-6z%20M14%2012h6v8h-6z%20M14%204h6v4h-6z%22%2F%3E%3C%2Fsvg%3E")}
+.ico-calendar{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207a2%202%200%200%201%202-2h12a2%202%200%200%201%202%202v12a2%202%200%200%201-2%202h-12a2%202%200%200%201-2-2z%20M16%203v4%20M8%203v4%20M4%2011h16%22%2F%3E%3C%2Fsvg%3E")}
+.ico-clipboard{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9%205h-2a2%202%200%200%200-2%202v12a2%202%200%200%200%202%202h10a2%202%200%200%200%202-2v-12a2%202%200%200%200-2-2h-2%20M9%203m0%202a2%202%200%200%201%202-2h2a2%202%200%200%201%202%202a2%202%200%200%201-2%202h-2a2%202%200%200%201-2-2z%20M9%2012h6%20M9%2016h6%22%2F%3E%3C%2Fsvg%3E")}
+.ico-file{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203v4a1%201%200%200%200%201%201h4%20M17%2021h-10a2%202%200%200%201-2-2v-14a2%202%200%200%201%202-2h7l5%205v11a2%202%200%200%201-2%202z%20M9%2013h6%20M9%2017h6%22%2F%3E%3C%2Fsvg%3E")}
+.ico-chart{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2013a1%201%200%200%201%201-1h4a1%201%200%200%201%201%201v6a1%201%200%200%201-1%201h-4a1%201%200%200%201-1-1z%20M9%209a1%201%200%200%201%201-1h4a1%201%200%200%201%201%201v10a1%201%200%200%201-1%201h-4a1%201%200%200%201-1-1z%20M15%205a1%201%200%200%201%201-1h4a1%201%200%200%201%201%201v14a1%201%200%200%201-1%201h-4a1%201%200%200%201-1-1z%20M4%2020h14%22%2F%3E%3C%2Fsvg%3E")}
+.ico-bolt{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M13%203v7h6l-8%2011v-7h-6z%22%2F%3E%3C%2Fsvg%3E")}
+.ico-refresh{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%2011a8.1%208.1%200%200%200-15.5-2m-.5-4v4h4%20M4%2013a8.1%208.1%200%200%200%2015.5%202m.5%204v-4h-4%22%2F%3E%3C%2Fsvg%3E")}
+.ico-settings{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2010a2%202%200%201%200%204%200a2%202%200%200%200-4%200%20M6%204v4%20M6%2012v8%20M10%2016a2%202%200%201%200%204%200a2%202%200%200%200-4%200%20M12%204v10%20M12%2018v2%20M16%207a2%202%200%201%200%204%200a2%202%200%200%200-4%200%20M18%204v1%20M18%209v11%22%2F%3E%3C%2Fsvg%3E")}
+.ico-checklist{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3.5%205.5l1.5%201.5l2.5-2.5%20M3.5%2011.5l1.5%201.5l2.5-2.5%20M3.5%2017.5l1.5%201.5l2.5-2.5%20M11%206h9%20M11%2012h9%20M11%2018h9%22%2F%3E%3C%2Fsvg%3E")}
+.ico-more{--ico:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%2012a1%201%200%201%200%202%200a1%201%200%200%200-2%200%20M11%2012a1%201%200%201%200%202%200a1%201%200%200%200-2%200%20M17%2012a1%201%200%201%200%202%200a1%201%200%200%200-2%200%22%2F%3E%3C%2Fsvg%3E")}
+
+/* sidebar gelap hanya untuk .sidebar; lembar "Menu Lainnya" (HP) memakai tampilan terang */
+#moreSheet{background:var(--bg) !important;border-top:1px solid var(--line) !important;border-radius:14px 14px 0 0 !important;box-shadow:0 -4px 0 #6c757d !important}
+#moreSheet .sb-item{color:var(--navy);border-left:3px solid transparent}
+#moreSheet .sb-item:hover{background:var(--green-light);color:var(--navy)}
+
+/* Modal tanda tangan: tombol aksi boleh turun baris (font Lexend lebih lebar) */
+#sig-blocks .fg[style*="flex-direction:row"]{flex-wrap:wrap}
+#sig-blocks .fg[style*="flex-direction:row"] .btn-primary{flex:1 1 150px}

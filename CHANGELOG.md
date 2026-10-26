@@ -354,3 +354,16 @@ membaca kode.
   kini benar-benar tersembunyi saat dicetak (sebelumnya `display:flex` inline mengalahkan `.no-print`).
 - **Database**: kolom `signatures.signers` (JSON; peran execute/checked/review/approved dengan nama, TTD PNG, waktu) + migrasi otomatis; klien lama tidak menghapusnya (COALESCE).
 - Uji: `node tools/test-api.js` (20 tes).
+
+## Tema tampilan "Boron" (neubrutalism)
+
+Hanya tampilan — alur kerja, logika bisnis, data, dan API tidak berubah.
+
+- `css/theme-boron.css` (dimuat setelah `style.css`): latar krem, sidebar hitam dengan item aktif krem, kartu ber-border gelap + bayangan keras,
+  tombol isi penuh dengan garis ganda bergeser, input bergaris tegas, judul halaman huruf besar dengan garis putus-putus, modal/toast bergaya sama.
+  Menghapus `<link>` tema di `index.html` mengembalikan tampilan lama.
+- Font Lexend di-host sendiri (`assets/fonts/`, ikut precache PWA). Nama font lama `IBM Plex Sans/Mono` dialiaskan ke Lexend
+  sehingga seluruh teks (termasuk gaya inline dari JS) berganti tanpa mengubah kode.
+- Ikon menu sidebar, "Menu Lainnya", dan navigasi bawah (HP) memakai ikon garis (topeng SVG, tanpa font ikon).
+- Warna grafik dashboard mengikuti palet tema. `theme-color` / `manifest` menjadi krem. Service worker `pm-3.4.0`.
+- Folder `Template/` (referensi desain, ±100 MB) tidak ikut di-commit maupun di-deploy (`.gitignore`, `.vercelignore`).

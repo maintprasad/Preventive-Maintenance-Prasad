@@ -13,3 +13,6 @@ node_modules/
 tools/foto-server/files/*
 !tools/foto-server/files/.htaccess
 tools/foto-server/config.php
+
+# Template tema (referensi desain, 100+ MB) — jangan di-commit
+Template/

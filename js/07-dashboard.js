@@ -1,3 +1,5 @@
+// Tema Boron: font grafik mengikuti font aplikasi (Lexend)
+if (window.Chart) Chart.defaults.font.family = "'Lexend', sans-serif";
 // ════════════════════════════════════════════════════════
 //  SCHEDULE STATUS (shared helper used by dashboard/schedule/etc.)
 // ════════════════════════════════════════════════════════
@@ -167,13 +169,13 @@ function renderDashboard() {
     charts[canvasId] = new Chart(canvas, {
       type: 'bar',
       data: { labels: areas, datasets: [
-        { label:'Plan (Terdaftar)', data:planData, backgroundColor:'rgba(43,108,184,.6)', borderColor:'rgba(43,108,184,.9)', borderWidth:1, borderRadius:4 },
-        { label:'Actual (Laporan Masuk)', data:actualData, backgroundColor:'rgba(74,158,63,.6)', borderColor:'rgba(74,158,63,.9)', borderWidth:1, borderRadius:4 }
+        { label:'Plan (Terdaftar)', data:planData, backgroundColor:'#60addf', borderColor:'#343a40', borderWidth:1, borderRadius:3 },
+        { label:'Actual (Laporan Masuk)', data:actualData, backgroundColor:'#70bb63', borderColor:'#343a40', borderWidth:1, borderRadius:3 }
       ]},
       options: {
         responsive:true, maintainAspectRatio:false,
         plugins:{
-          legend:{labels:{color:'#3a5a3a',font:{size:11}}},
+          legend:{labels:{color:'#4c4c5c',font:{size:11}}},
           tooltip:{callbacks:{afterLabel:(ctx)=>{
             if (ctx.datasetIndex===1) {
               const plan = ctx.chart.data.datasets[0].data[ctx.dataIndex];
@@ -184,8 +186,8 @@ function renderDashboard() {
           }}}
         },
         scales:{
-          x:{ticks:{color:'#7a9a7a',font:{size:10}},grid:{color:'rgba(26,42,26,.06)'}},
-          y:{ticks:{color:'#7a9a7a'},grid:{color:'rgba(26,42,26,.06)'},beginAtZero:true}
+          x:{ticks:{color:'#737a8a',font:{size:10}},grid:{color:'rgba(52,58,64,.12)'}},
+          y:{ticks:{color:'#737a8a'},grid:{color:'rgba(52,58,64,.12)'},beginAtZero:true}
         }
       }
     });
@@ -241,8 +243,8 @@ function renderDashboard() {
 }
 
 function drawDashboardCharts(reports, schedules) {
-  const gc = 'rgba(26,42,26,.06)';
-  const opts = {responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#3a5a3a',font:{size:11}}}}};
+  const gc = 'rgba(52,58,64,.12)';
+  const opts = {responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#4c4c5c',font:{size:11}}}}};
 
   const sc = {overdue:0,upcoming:0,done:0};
   schedules.forEach(s => { sc[getScheduleStatus(s)]=(sc[getScheduleStatus(s)]||0)+1; });
@@ -256,9 +258,9 @@ function drawDashboardCharts(reports, schedules) {
         const pct = v => total ? Math.round(v/total*100) : 0;
         return [`Overdue — ${sc.overdue} (${pct(sc.overdue)}%)`, `Upcoming — ${sc.upcoming} (${pct(sc.upcoming)}%)`, `On Track — ${sc.done} (${pct(sc.done)}%)`];
       })(),
-      datasets:[{data:[sc.overdue,sc.upcoming,sc.done],backgroundColor:['rgba(192,57,43,.7)','rgba(230,126,34,.7)','rgba(74,158,63,.7)'],borderColor:'#fff',borderWidth:2}]
+      datasets:[{data:[sc.overdue,sc.upcoming,sc.done],backgroundColor:['#ed6060','#ebb751','#70bb63'],borderColor:'#343a40',borderWidth:1.5}]
     },
-    options:{...opts, plugins:{legend:{labels:{color:'#3a5a3a',font:{size:12},padding:14}}, tooltip:{callbacks:{label: ctx => `${ctx.label}: ${ctx.raw} equipment`}}}}
+    options:{...opts, plugins:{legend:{labels:{color:'#4c4c5c',font:{size:12},padding:14}}, tooltip:{callbacks:{label: ctx => `${ctx.label}: ${ctx.raw} equipment`}}}}
   });
 
   const now = new Date();
@@ -272,8 +274,8 @@ function drawDashboardCharts(reports, schedules) {
   const cMonthlyEl = document.getElementById('cMonthly');
   if (cMonthlyEl) charts.cMonthly = new Chart(cMonthlyEl, {
     type:'bar',
-    data:{labels:months6.map(m=>m.label),datasets:[{label:'Laporan PM',data:monthly,backgroundColor:'rgba(74,158,63,.6)',borderColor:'var(--green)',borderWidth:1,borderRadius:4}]},
-    options:{...opts,plugins:{...opts.plugins,legend:{display:false}},scales:{x:{ticks:{color:'#7a9a7a',font:{size:10}},grid:{color:gc}},y:{ticks:{color:'#7a9a7a'},grid:{color:gc},beginAtZero:true}}}
+    data:{labels:months6.map(m=>m.label),datasets:[{label:'Laporan PM',data:monthly,backgroundColor:'#70bb63',borderColor:'#343a40',borderWidth:1,borderRadius:3}]},
+    options:{...opts,plugins:{...opts.plugins,legend:{display:false}},scales:{x:{ticks:{color:'#737a8a',font:{size:10}},grid:{color:gc}},y:{ticks:{color:'#737a8a'},grid:{color:gc},beginAtZero:true}}}
   });
 }
 
